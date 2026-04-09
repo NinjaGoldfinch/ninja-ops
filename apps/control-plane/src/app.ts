@@ -8,6 +8,8 @@ import rateLimitPlugin from './plugins/rate-limit.js'
 import authPlugin from './plugins/auth.js'
 import swaggerPlugin from './plugins/swagger.js'
 
+import authRoutes from './routes/auth/index.js'
+
 export async function buildApp() {
   const app = Fastify({
     logger: {
@@ -23,6 +25,9 @@ export async function buildApp() {
   await app.register(rateLimitPlugin)
   await app.register(authPlugin)
   await app.register(swaggerPlugin)
+
+  // Routes
+  await app.register(authRoutes, { prefix: '/api/auth' })
 
   // Health check — no auth required
   app.get('/healthz', async () => ({ ok: true }))
