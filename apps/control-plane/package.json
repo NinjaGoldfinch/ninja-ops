@@ -1,0 +1,44 @@
+{
+  "name": "@ninja/control-plane",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:seed": "tsx scripts/seed.ts"
+  },
+  "dependencies": {
+    "@ninja/types": "workspace:*",
+    "@fastify/cors": "^10",
+    "@fastify/rate-limit": "^10",
+    "@fastify/swagger": "^9",
+    "@fastify/websocket": "^11",
+    "@scalar/fastify-api-reference": "^1",
+    "bcrypt": "^5",
+    "bullmq": "^5",
+    "fastify": "^5",
+    "ioredis": "^5",
+    "jose": "^5",
+    "postgres": "^3",
+    "ssh2": "^1",
+    "zod": "^3.23",
+    "zod-to-json-schema": "^3",
+    "pino": "^9",
+    "pino-pretty": "^11"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5",
+    "@types/node": "^22",
+    "@types/ssh2": "^1",
+    "tsx": "^4",
+    "vitest": "^2",
+    "typescript": "^5.5"
+  }
+}

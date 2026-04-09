@@ -19,5 +19,14 @@
   "engines": {
     "node": ">=22",
     "pnpm": ">=9"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "bcrypt",
+      "cpu-features",
+      "esbuild",
+      "msgpackr-extract",
+      "ssh2"
+    ]
   }
 }
