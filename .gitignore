@@ -32,6 +32,9 @@ coverage/
 # Docker volumes (local dev)
 docker/volumes/
 
+# Claude Code local files
+.claude/
+
 # Secrets — never commit these
 *.pem
 *.key
