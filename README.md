@@ -1,0 +1,74 @@
+# ninja-ops
+
+Self-hosted Proxmox management and deployment platform. Manage VMs and LXC containers, trigger deployments from GitHub Actions, and stream real-time metrics — all from a single control plane.
+
+## Stack
+
+| Layer | Technology |
+|---|---|
+| Runtime | Node.js 22 |
+| Package manager | pnpm 10 + Turborepo |
+| Language | TypeScript (strict, ESM) |
+| Validation | Zod 3 |
+| API | Fastify 5 (REST + WebSocket) |
+| Database | PostgreSQL 16 (postgres.js) |
+| Cache / queues | Redis 7 + BullMQ |
+| Testing | Vitest |
+
+## Monorepo structure
+
+```
+ninja-ops/
+├── apps/
+│   ├── control-plane/      # Fastify REST + WebSocket API (implemented)
+│   ├── dashboard/          # React/Vite frontend (planned)
+│   ├── deploy-agent/       # Agent that runs on each managed container (planned)
+│   ├── forge-cli/          # CLI tool (planned)
+│   └── log-service/        # Log aggregation service (planned)
+├── packages/
+│   └── types/              # Shared Zod schemas and TypeScript types
+└── docker/
+    └── docker-compose.yml  # Local dev: Postgres + Redis
+```
+
+## Quick start
+
+```bash
+# 1. Install dependencies
+pnpm install
+
+# 2. Start dev infrastructure
+docker compose -f docker/docker-compose.yml up -d
+
+# 3. Set up control-plane environment
+cp apps/control-plane/.env.example apps/control-plane/.env
+# Edit .env and fill in JWT_SECRET, ENCRYPTION_KEY, AGENT_SECRET, GITHUB_WEBHOOK_SECRET
+# See docs/setup.md for secret generation commands
+
+# 4. Run database migrations
+pnpm --filter @ninja/control-plane db:migrate
+
+# 5. Seed the admin user (default: admin / changeme123!)
+pnpm --filter @ninja/control-plane db:seed
+
+# 6. Start all services with hot reload
+pnpm dev
+```
+
+The control plane will be available at `http://localhost:3000`. API docs at `http://localhost:3000/api/docs`.
+
+## Workspace commands
+
+| Command | Description |
+|---|---|
+| `pnpm dev` | Start all services with hot reload |
+| `pnpm build` | Build all packages and apps |
+| `pnpm test` | Run all tests |
+| `pnpm typecheck` | Type-check all packages |
+| `pnpm lint` | Lint all packages |
+| `pnpm lint:fix` | Lint and auto-fix |
+
+## Documentation
+
+- [Setup guide](docs/setup.md) — detailed local dev setup, env var reference, troubleshooting
+- [Architecture](docs/architecture.md) — system design, data flows, API inventory
