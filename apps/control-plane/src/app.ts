@@ -14,6 +14,7 @@ import guestRoutes from './routes/guests/index.js'
 import deployTargetRoutes from './routes/deploy/targets.js'
 import deployJobRoutes from './routes/deploy/jobs.js'
 import githubWebhookRoutes from './routes/webhooks/github.js'
+import agentRoutes from './routes/agents/index.js'
 import auditRoutes from './routes/audit/index.js'
 
 export async function buildApp() {
@@ -56,6 +57,7 @@ export async function buildApp() {
   await app.register(deployTargetRoutes, { prefix: '/api/deploy/targets' })
   await app.register(deployJobRoutes, { prefix: '/api/deploy/jobs' })
   await app.register(githubWebhookRoutes, { prefix: '/api/webhooks' })
+  await app.register(agentRoutes, { prefix: '/api/agents' })
   await app.register(auditRoutes, { prefix: '/api/audit' })
 
   // Health check — no auth required
