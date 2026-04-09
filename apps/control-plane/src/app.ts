@@ -16,6 +16,8 @@ import deployJobRoutes from './routes/deploy/jobs.js'
 import githubWebhookRoutes from './routes/webhooks/github.js'
 import agentRoutes from './routes/agents/index.js'
 import auditRoutes from './routes/audit/index.js'
+import { registerWebSocket } from './ws/router.js'
+import { registerAgentWebSocket } from './ws/agent-router.js'
 
 export async function buildApp() {
   const app = Fastify({
@@ -59,6 +61,10 @@ export async function buildApp() {
   await app.register(githubWebhookRoutes, { prefix: '/api/webhooks' })
   await app.register(agentRoutes, { prefix: '/api/agents' })
   await app.register(auditRoutes, { prefix: '/api/audit' })
+
+  // WebSocket endpoints
+  await app.register(registerWebSocket)
+  await app.register(registerAgentWebSocket)
 
   // Health check — no auth required
   app.get('/healthz', async () => ({ ok: true }))
