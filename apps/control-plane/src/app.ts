@@ -9,6 +9,8 @@ import authPlugin from './plugins/auth.js'
 import swaggerPlugin from './plugins/swagger.js'
 
 import authRoutes from './routes/auth/index.js'
+import nodeRoutes from './routes/nodes/index.js'
+import auditRoutes from './routes/audit/index.js'
 
 export async function buildApp() {
   const app = Fastify({
@@ -28,6 +30,8 @@ export async function buildApp() {
 
   // Routes
   await app.register(authRoutes, { prefix: '/api/auth' })
+  await app.register(nodeRoutes, { prefix: '/api/nodes' })
+  await app.register(auditRoutes, { prefix: '/api/audit' })
 
   // Health check — no auth required
   app.get('/healthz', async () => ({ ok: true }))
