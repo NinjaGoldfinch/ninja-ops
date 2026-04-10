@@ -109,8 +109,9 @@ async function runProvisioningJob(jobId: string): Promise<void> {
 
   const startAfterCreate = (params as LxcCreateRequest).startAfterCreate
   if (startAfterCreate) {
-    // Start the guest
-    await proxmoxService.powerAction(cfg, row.guest_type, row.vmid, 'start')
+    // Proxmox starts the guest automatically when start=1 is passed to create.
+    // Don't call powerAction here — the guest may already be running and the
+    // API returns 500 "CT already running" in that case.
 
     // Poll until running (60s timeout)
     const deadline = Date.now() + 60_000
