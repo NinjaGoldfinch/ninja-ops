@@ -84,6 +84,9 @@ export const AUDIT_ACTIONS = [
   'target_create',
   'target_update',
   'target_delete',
+  'provision_lxc',
+  'provision_qemu',
+  'provision_delete',
 ] as const
 export const AuditActionSchema = z.enum(AUDIT_ACTIONS)
 export type AuditAction = z.infer<typeof AuditActionSchema>

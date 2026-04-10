@@ -3,6 +3,7 @@ import { GuestMetricsSchema, NodeMetricsSchema } from './proxmox.js'
 import { DeployJobSchema, DeployLogLineSchema } from './deploy.js'
 import { LogEntrySchema, LogSubscriptionSchema } from './logs.js'
 import { AgentCommandSchema, AgentHeartbeatSchema, AgentResultSchema } from './agent.js'
+import { ProvisioningJobSchema } from './provisioning.js'
 
 // ── Client → Server ───────────────────────────────────────────────────────
 
@@ -129,6 +130,12 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
     type: z.literal('terminal_closed'),
     sessionId: z.string().uuid(),
     reason: z.string().optional(),
+  }),
+
+  // Provisioning job state transitions
+  z.object({
+    type: z.literal('provisioning_update'),
+    data: ProvisioningJobSchema,
   }),
 
   // Generic error
