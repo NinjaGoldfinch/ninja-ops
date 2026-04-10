@@ -35,10 +35,12 @@ export async function buildApp() {
     { parseAs: 'buffer' },
     function (_req, body, done) {
       try {
-        const parsed = JSON.parse((body as Buffer).toString()) as unknown
+        const raw = (body as Buffer)
+        const str = raw.toString()
+        const parsed = str.length > 0 ? JSON.parse(str) as unknown : null
         // Attach raw buffer to request for webhook routes
         const req = _req as { rawBody?: Buffer }
-        req.rawBody = body as Buffer
+        req.rawBody = raw
         done(null, parsed)
       } catch (err) {
         done(err as Error, undefined)

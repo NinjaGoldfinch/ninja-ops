@@ -13,6 +13,7 @@ Self-hosted Proxmox management and deployment platform. Manage VMs and LXC conta
 | API | Fastify 5 (REST + WebSocket) |
 | Database | PostgreSQL 18 (postgres.js) |
 | Cache / queues | Redis 7 + BullMQ |
+| Frontend | React 19, Vite 5, TanStack Router/Query, Zustand, Tailwind CSS v4 |
 | Testing | Vitest |
 
 ## Monorepo structure
@@ -20,8 +21,8 @@ Self-hosted Proxmox management and deployment platform. Manage VMs and LXC conta
 ```
 ninja-ops/
 ├── apps/
-│   ├── control-plane/      # Fastify REST + WebSocket API (implemented)
-│   ├── dashboard/          # React/Vite frontend (planned)
+│   ├── control-plane/      # Fastify REST + WebSocket API
+│   ├── dashboard/          # React 19 + Vite frontend (port 5173)
 │   ├── deploy-agent/       # Agent that runs on each managed container (planned)
 │   ├── forge-cli/          # CLI tool (planned)
 │   └── log-service/        # Log aggregation service (planned)
@@ -66,7 +67,15 @@ pnpm --filter @ninja/control-plane db:seed
 pnpm dev
 ```
 
-The control plane will be available at `http://localhost:3000`. API docs at `http://localhost:3000/api/docs`.
+| Service | URL |
+|---|---|
+| Dashboard | `http://localhost:5173` |
+| Control plane API | `http://localhost:3000` |
+| API docs (Scalar) | `http://localhost:3000/api/docs` |
+
+Default login: **admin** / **changeme123!**
+
+> `pnpm dev` uses Turborepo's TUI — each service gets its own pane. Press `1`/`2` to switch between them.
 
 ## Workspace commands
 

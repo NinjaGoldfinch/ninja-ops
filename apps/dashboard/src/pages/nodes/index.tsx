@@ -1,7 +1,8 @@
 import { createRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { layoutRoute } from '@/layout-route'
-import { useNodes, useCreateNode, useDeleteNode, useSyncNode, useTestNodeConnection } from '@/hooks/useNodes'
+import { useNodes, useCreateNode, useUpdateNode, useDeleteNode, useSyncNode, useTestNodeConnection } from '@/hooks/useNodes'
+import { useNodeMetrics } from '@/hooks/useMetrics'
 import { useAuthStore } from '@/stores/auth'
 import { useToast } from '@/components/ui/toast'
 import { Button } from '@/components/ui/button'
@@ -11,7 +12,7 @@ import { Sheet } from '@/components/ui/sheet'
 import { NodeStatusBadge } from '@/components/nodes/NodeStatusBadge'
 import { QueryError } from '@/components/ui/query-error'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Plus, RefreshCw, Trash2, CheckCircle, XCircle } from 'lucide-react'
+import { Plus, RefreshCw, Trash2, Pencil, CheckCircle, XCircle } from 'lucide-react'
 import { formatRelative } from '@/lib/utils'
 import type { ProxmoxNode } from '@ninja/types'
 
@@ -36,6 +37,7 @@ function initialForm(): NodeFormData {
 function NodesPage() {
   const { data: nodes, isLoading, error, refetch } = useNodes()
   const { mutate: createNode, isPending: creating } = useCreateNode()
+  const { mutate: updateNode, isPending: updating } = useUpdateNode()
   const { mutate: deleteNode } = useDeleteNode()
   const { mutate: syncNode } = useSyncNode()
   const { mutate: testConnection, isPending: testing } = useTestNodeConnection()
@@ -43,6 +45,7 @@ function NodesPage() {
   const { toast } = useToast()
 
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [editingNode, setEditingNode] = useState<ProxmoxNode | null>(null)
   const [form, setForm] = useState<NodeFormData>(initialForm)
   const [testResult, setTestResult] = useState<boolean | null>(null)
 
@@ -71,6 +74,20 @@ function NodesPage() {
     )
   }
 
+  function openEdit(node: ProxmoxNode) {
+    setEditingNode(node)
+    setForm({ name: node.name, host: node.host, port: String(node.port), tokenId: node.tokenId, tokenSecret: '' })
+    setTestResult(null)
+    setSheetOpen(true)
+  }
+
+  function closeSheet() {
+    setSheetOpen(false)
+    setEditingNode(null)
+    setForm(initialForm())
+    setTestResult(null)
+  }
+
   function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     createNode(
@@ -84,11 +101,32 @@ function NodesPage() {
       {
         onSuccess: () => {
           toast({ title: 'Node added', variant: 'success' })
-          setSheetOpen(false)
-          setForm(initialForm())
+          closeSheet()
         },
         onError: (err) =>
           toast({ title: 'Failed to add node', description: String(err), variant: 'error' }),
+      },
+    )
+  }
+
+  function handleUpdate(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editingNode) return
+    const input: Record<string, string | number> = {}
+    if (form.name !== editingNode.name) input.name = form.name
+    if (form.host !== editingNode.host) input.host = form.host
+    if (Number(form.port) !== editingNode.port) input.port = Number(form.port) || 8006
+    if (form.tokenId !== editingNode.tokenId) input.tokenId = form.tokenId
+    if (form.tokenSecret) input.tokenSecret = form.tokenSecret
+    updateNode(
+      { nodeId: editingNode.id, input },
+      {
+        onSuccess: () => {
+          toast({ title: 'Node updated', variant: 'success' })
+          closeSheet()
+        },
+        onError: (err) =>
+          toast({ title: 'Failed to update node', description: String(err), variant: 'error' }),
       },
     )
   }
@@ -119,7 +157,7 @@ function NodesPage() {
           {nodes?.length ?? '—'} node{nodes?.length !== 1 ? 's' : ''} registered
         </p>
         {isAdmin && (
-          <Button size="sm" onClick={() => setSheetOpen(true)}>
+          <Button size="sm" onClick={() => { setEditingNode(null); setSheetOpen(true) }}>
             <Plus size={14} />
             Add node
           </Button>
@@ -151,48 +189,14 @@ function NodesPage() {
                   </tr>
                 ))
               : nodes?.map((node) => (
-                  <tr
+                  <NodeRow
                     key={node.id}
-                    className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
-                  >
-                    <td className="px-4 py-2.5 font-medium text-sm text-zinc-900 dark:text-zinc-100">
-                      {node.name}
-                    </td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-zinc-500 dark:text-zinc-400">
-                      {node.host}:{node.port}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <NodeStatusBadge status={node.status} />
-                    </td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-zinc-600 dark:text-zinc-400">—</td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-zinc-600 dark:text-zinc-400">—</td>
-                    <td className="px-4 py-2.5 text-xs text-zinc-500 dark:text-zinc-400">
-                      {formatRelative(node.updatedAt)}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleSync(node.id)}
-                          aria-label="Sync"
-                        >
-                          <RefreshCw size={14} />
-                        </Button>
-                        {isAdmin && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(node)}
-                            className="text-red-500 hover:text-red-600"
-                            aria-label="Delete"
-                          >
-                            <Trash2 size={14} />
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                    node={node}
+                    isAdmin={isAdmin}
+                    onSync={() => handleSync(node.id)}
+                    onEdit={() => openEdit(node)}
+                    onDelete={() => handleDelete(node)}
+                  />
                 ))}
             {!isLoading && (!nodes || nodes.length === 0) && (
               <tr>
@@ -216,11 +220,11 @@ function NodesPage() {
 
       <Sheet
         open={sheetOpen}
-        onClose={() => { setSheetOpen(false); setForm(initialForm()); setTestResult(null) }}
-        title="Add Node"
-        description="Connect a Proxmox node to ninja-ops."
+        onClose={closeSheet}
+        title={editingNode ? `Edit ${editingNode.name}` : 'Add Node'}
+        description={editingNode ? 'Update connection details for this node.' : 'Connect a Proxmox node to ninja-ops.'}
       >
-        <form onSubmit={(e) => void handleCreate(e)} className="space-y-4">
+        <form onSubmit={(e) => void (editingNode ? handleUpdate(e) : handleCreate(e))} className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="name">Name</Label>
             <Input id="name" value={form.name} onChange={set('name')} placeholder="pve-01" required />
@@ -238,14 +242,16 @@ function NodesPage() {
             <Input id="tokenId" value={form.tokenId} onChange={set('tokenId')} placeholder="user@pam!mytoken" required />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="tokenSecret">Token Secret</Label>
+            <Label htmlFor="tokenSecret">
+              Token Secret{editingNode && <span className="ml-1 text-zinc-400 font-normal">(leave blank to keep current)</span>}
+            </Label>
             <Input
               id="tokenSecret"
               type="password"
               value={form.tokenSecret}
               onChange={set('tokenSecret')}
               placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-              required
+              required={!editingNode}
             />
           </div>
 
@@ -269,12 +275,75 @@ function NodesPage() {
             <Button type="button" variant="outline" onClick={() => setSheetOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={creating}>
-              {creating ? 'Adding…' : 'Add node'}
+            <Button type="submit" disabled={creating || updating}>
+              {editingNode ? (updating ? 'Saving…' : 'Save changes') : (creating ? 'Adding…' : 'Add node')}
             </Button>
           </div>
         </form>
       </Sheet>
     </div>
+  )
+}
+
+// ─── Node Row ─────────────────────────────────────────────────────────────────
+
+function NodeRow({
+  node,
+  isAdmin,
+  onSync,
+  onEdit,
+  onDelete,
+}: {
+  node: ProxmoxNode
+  isAdmin: boolean
+  onSync: () => void
+  onEdit: () => void
+  onDelete: () => void
+}) {
+  const { latest } = useNodeMetrics(node.id)
+  const cpuPct = latest ? `${Math.round(latest.cpu * 100)}%` : '—'
+  const memPct =
+    latest && latest.maxmem > 0
+      ? `${Math.round((latest.mem / latest.maxmem) * 100)}%`
+      : '—'
+
+  return (
+    <tr className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+      <td className="px-4 py-2.5 font-medium text-sm text-zinc-900 dark:text-zinc-100">{node.name}</td>
+      <td className="px-4 py-2.5 font-mono text-xs text-zinc-500 dark:text-zinc-400">
+        {node.host}:{node.port}
+      </td>
+      <td className="px-4 py-2.5">
+        <NodeStatusBadge status={node.status} />
+      </td>
+      <td className="px-4 py-2.5 font-mono text-xs text-zinc-600 dark:text-zinc-400">{cpuPct}</td>
+      <td className="px-4 py-2.5 font-mono text-xs text-zinc-600 dark:text-zinc-400">{memPct}</td>
+      <td className="px-4 py-2.5 text-xs text-zinc-500 dark:text-zinc-400">
+        {formatRelative(node.updatedAt)}
+      </td>
+      <td className="px-4 py-2.5">
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" onClick={onSync} aria-label="Sync">
+            <RefreshCw size={14} />
+          </Button>
+          {isAdmin && (
+            <>
+              <Button variant="ghost" size="icon" onClick={onEdit} aria-label="Edit">
+                <Pencil size={14} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onDelete}
+                className="text-red-500 hover:text-red-600"
+                aria-label="Delete"
+              >
+                <Trash2 size={14} />
+              </Button>
+            </>
+          )}
+        </div>
+      </td>
+    </tr>
   )
 }

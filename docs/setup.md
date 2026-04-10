@@ -110,13 +110,22 @@ ADMIN_USERNAME=yourname ADMIN_PASSWORD=yourpassword \
 pnpm dev
 ```
 
-Or just the control plane:
+This starts all services via Turborepo's TUI — each service gets its own pane. Use the number keys (`1`, `2`, …) to switch between service logs.
+
+To run services individually:
 
 ```bash
-pnpm --filter @ninja/control-plane dev
+pnpm --filter @ninja/control-plane dev   # control plane only (port 3000)
+pnpm --filter @ninja/dashboard dev       # dashboard only (port 5173)
 ```
 
 ### 7. Verify
+
+| Service | URL |
+|---|---|
+| Dashboard | `http://localhost:5173` |
+| Control plane | `http://localhost:3000` |
+| API docs (Scalar) | `http://localhost:3000/api/docs` |
 
 ```bash
 # Health check
@@ -130,7 +139,21 @@ curl -X POST http://localhost:3000/api/auth/login \
 # → {"ok":true,"data":{"token":"...","user":{...}}}
 ```
 
-API docs (Scalar): `http://localhost:3000/api/docs`
+Default dashboard credentials: **admin** / **changeme123!** (set by `db:seed`, overridable via env vars — see step 5).
+
+---
+
+## Dashboard scripts
+
+Run from `apps/dashboard/` or with `pnpm --filter @ninja/dashboard <script>`:
+
+| Script | Command | Description |
+|---|---|---|
+| `dev` | `vite` | Start with hot reload (port 5173) |
+| `build` | `tsc && vite build` | Type-check then bundle to `dist/` |
+| `preview` | `vite preview` | Preview production build |
+| `typecheck` | `tsc --noEmit` | Type-check without emitting |
+| `lint` | `eslint src` | Lint source |
 
 ---
 

@@ -4,11 +4,11 @@
 
 ```mermaid
 graph TB
-    Browser["Browser\ndashboard · React/Vite (planned)"]
+    Browser["Browser\ndashboard · React 19 + Vite · port 5173"]
     ForgeCLI["forge-cli (planned)\nCLI · manual deploys & node mgmt"]
     LogService["log-service (planned)\nVector → Loki"]
 
-    subgraph CP["control-plane · Fastify 5 · Node.js 22"]
+    subgraph CP["control-plane · Fastify 5 · Node.js 22 · port 3000"]
         Routes["Routes (thin)"]
         Services["Services (logic)"]
         Workers["Workers\nmetrics-poller · deploy-runner"]
@@ -22,7 +22,7 @@ graph TB
         Workers --> Services
     end
 
-    Browser -- "REST + WebSocket (/ws)" --> CP
+    Browser -- "REST /api/* + WebSocket /ws" --> CP
     ForgeCLI -- "REST" --> CP
     LogService -. "planned" .-> CP
 
@@ -37,9 +37,73 @@ graph TB
     end
 ```
 
+**dashboard** — React 19 SPA served by Vite on port 5173. In development, Vite proxies `/api/*` and `/ws` to the control plane at `localhost:3000` so there are no CORS concerns locally. In production, serve the built `dist/` behind the same origin as the API (or configure `CORS_ORIGIN`).
+
 **forge-cli** (planned) — CLI for manual deploys and node management, talks to the control-plane REST API.
 
 **log-service** (planned) — Log aggregation from containers, likely via Vector → Loki.
+
+---
+
+## Dashboard internals
+
+```
+src/
+├── main.tsx               QueryClient setup, RouterProvider, ToastProvider, WS connect
+├── router.ts              Route tree assembly (rootRoute → loginRoute + layoutRoute → pages)
+├── root-route.ts          createRootRoute — no auth, no layout
+├── layout-route.tsx       Auth guard (beforeLoad) + AppLayout wrapper for authenticated pages
+│
+├── lib/
+│   ├── api.ts             Typed fetch wrapper — attaches Bearer token, handles 401 → logout
+│   ├── ws.ts              WebSocket singleton — exponential backoff reconnect, on/send/connect
+│   └── utils.ts           cn(), formatBytes(), formatUptime(), formatRelative(), etc.
+│
+├── stores/
+│   ├── auth.ts            Zustand — { token, user, login(), logout() } — sessionStorage
+│   └── ui.ts              Zustand — { theme, sidebarCollapsed } — localStorage
+│
+├── hooks/
+│   ├── useNodes.ts        TanStack Query hooks for nodes
+│   ├── useGuests.ts       Guests, power actions, snapshots
+│   ├── useMetrics.ts      WS metrics subscription + 60-entry ring buffer
+│   ├── useDeploy.ts       Deploy targets and jobs
+│   ├── useDeployLogs.ts   Live (WS) or historical (REST) deploy logs
+│   ├── useAgents.ts       Agent list, WS-driven invalidation
+│   └── useAudit.ts        Audit log with cursor pagination
+│
+├── components/
+│   ├── layout/            AppLayout, Sidebar, TopBar
+│   ├── ui/                Badge, Button, Input, Label, Skeleton, Tabs, Toast, …
+│   ├── metrics/           CpuChart, MemoryChart, NetworkChart, GuestMetricsSparkline
+│   └── terminal/          Terminal (xterm.js + FitAddon + ResizeObserver)
+│
+└── pages/
+    ├── login.tsx
+    ├── index.tsx          Dashboard overview
+    ├── nodes/
+    │   ├── index.tsx      Node list
+    │   └── $nodeId/
+    │       ├── route.ts   nodeIdRoute (layout)
+    │       ├── index.tsx  Node detail + guest list
+    │       └── guests/
+    │           └── $vmid.tsx  Guest detail (metrics, snapshots, terminal, commands)
+    ├── deploy/
+    │   ├── index.tsx      Deploy targets + trigger
+    │   └── $jobId.tsx     Job detail + live log viewer
+    ├── agents/
+    │   └── index.tsx      Agent registry
+    ├── audit/
+    │   └── index.tsx      Audit log
+    └── settings/
+        └── index.tsx      Theme toggle, password change
+```
+
+Key design choices:
+- **Route splitting** — `root-route.ts` has no imports from pages; `layout-route.tsx` holds the auth guard + `AppLayout`; `router.ts` assembles the tree. This avoids circular imports.
+- **WS singleton** — `ws.ts` is a module-level singleton. Components subscribe via `ws.on()` inside `useEffect` and unsubscribe on cleanup.
+- **Metrics ring buffer** — `useMetrics` keeps the last 60 samples in a `useRef` array and flushes to state at most once per animation frame.
+- **exactOptionalPropertyTypes** — all optional fields use the spread pattern (`...(x ? { field: x } : {})`) to satisfy the strict tsconfig inherited from the workspace root.
 
 ---
 

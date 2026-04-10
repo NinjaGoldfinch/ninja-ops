@@ -35,6 +35,25 @@ export function useCreateNode() {
   })
 }
 
+interface UpdateNodeInput {
+  name?: string
+  host?: string
+  port?: number
+  tokenId?: string
+  tokenSecret?: string
+}
+
+export function useUpdateNode() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ nodeId, input }: { nodeId: string; input: UpdateNodeInput }) =>
+      api.put<ProxmoxNode>(`/api/nodes/${nodeId}`, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['nodes'] })
+    },
+  })
+}
+
 export function useDeleteNode() {
   const queryClient = useQueryClient()
   return useMutation({

@@ -71,11 +71,10 @@ export class SessionManager {
   }
 
   broadcastNodeMetrics(nodeId: string, data: NodeMetrics): void {
-    const key = `${nodeId}:*`
     for (const session of this.sessions.values()) {
-      // Broadcast to any session subscribed to any guest on this node
-      const hasNodeSub = [...session.metricSubscriptions].some(k => k.startsWith(`${nodeId}:`))
-      if (hasNodeSub || session.metricSubscriptions.has(key)) {
+      // Send to all authenticated sessions — the overview page needs node metrics
+      // without having any guest subscriptions active
+      if (session.userId) {
         send(session.ws, { type: 'metrics_node', data })
       }
     }
