@@ -1,0 +1,42 @@
+{
+  "name": "@ninja/dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@ninja/types": "workspace:*",
+    "@tanstack/react-query": "^5",
+    "@tanstack/react-router": "^1",
+    "@xterm/xterm": "^5",
+    "@xterm/addon-fit": "^0.10",
+    "@xterm/addon-web-links": "^0.11",
+    "lucide-react": "^0.400.0",
+    "recharts": "^2",
+    "zustand": "^5",
+    "react": "^19",
+    "react-dom": "^19",
+    "clsx": "^2",
+    "tailwind-merge": "^2",
+    "date-fns": "^3"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/node": "^22",
+    "@vitejs/plugin-react": "^4",
+    "tailwindcss": "^4",
+    "@tailwindcss/vite": "^4",
+    "vite": "^5",
+    "typescript": "^5.5",
+    "eslint": "^9",
+    "@typescript-eslint/eslint-plugin": "^8",
+    "@typescript-eslint/parser": "^8"
+  }
+}
