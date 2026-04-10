@@ -4,6 +4,7 @@ import { PowerActionRequestSchema, CreateSnapshotRequestSchema } from '@ninja/ty
 import { nodeService } from '../../services/node.js'
 import { proxmoxService } from '../../services/proxmox.js'
 import { auditService } from '../../services/audit.js'
+import { deployAgentIntoLxc } from '../../services/agent-deployer.js'
 import { AppError } from '../../errors.js'
 import { requireRole } from '../../plugins/rbac.js'
 
@@ -15,13 +16,16 @@ function validationError(error: z.ZodError) {
 }
 
 async function getNodeConfig(nodeId: string) {
-  const { node, tokenSecret } = await nodeService.getWithSecret(nodeId)
+  const { node, tokenSecret, sshPassword, sshHost } = await nodeService.getWithSecret(nodeId)
   return {
     host: node.host,
     port: node.port,
     tokenId: node.tokenId,
     tokenSecret,
     nodeName: node.name,
+    sshUser: node.sshUser,
+    sshPassword,
+    sshHost,
   }
 }
 
@@ -158,6 +162,35 @@ export default async function guestRoutes(app: FastifyInstance) {
       })
 
       return reply.status(204).send()
+    },
+  )
+
+  // POST /api/nodes/:nodeId/guests/:vmid/deploy-agent
+  app.post(
+    '/:nodeId/guests/:vmid/deploy-agent',
+    { preHandler: [app.authenticate, requireRole('admin')] },
+    async (request, reply) => {
+      const { nodeId, vmid: vmidStr } = request.params as { nodeId: string; vmid: string }
+      const vmid = parseInt(vmidStr, 10)
+      const cfg = await getNodeConfig(nodeId)
+      const guest = await resolveGuest(cfg, nodeId, vmid)
+
+      if (guest.type !== 'lxc') {
+        throw AppError.validationError('Agent deployment is only supported for LXC containers', [])
+      }
+
+      await deployAgentIntoLxc(cfg, vmid, nodeId)
+
+      auditService.log({
+        userId: request.user.sub,
+        username: request.user.username,
+        action: 'agent_deploy',
+        resourceType: 'guest',
+        resourceId: `${nodeId}/${vmid}`,
+        ip: request.ip,
+      })
+
+      return reply.send({ ok: true, data: { deployed: true } })
     },
   )
 }

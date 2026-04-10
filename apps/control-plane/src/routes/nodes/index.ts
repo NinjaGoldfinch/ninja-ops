@@ -14,6 +14,7 @@ const CreateNodeSchema = z.object({
   tokenSecret: z.string().min(1),
   sshUser: z.string().min(1).default('root'),
   sshPassword: z.string().min(1).optional(),
+  sshHost: z.string().min(1).optional(),
 })
 
 const UpdateNodeSchema = z.object({
@@ -24,6 +25,7 @@ const UpdateNodeSchema = z.object({
   tokenSecret: z.string().min(1).optional(),
   sshUser: z.string().min(1).optional(),
   sshPassword: z.string().min(1).optional(),
+  sshHost: z.string().optional(),   // empty string clears the override
 })
 
 const TestConnectionSchema = z.object({
@@ -72,6 +74,7 @@ export default async function nodeRoutes(app: FastifyInstance) {
         tokenSecret: body.data.tokenSecret,
         sshUser: body.data.sshUser,
         ...(body.data.sshPassword !== undefined ? { sshPassword: body.data.sshPassword } : {}),
+        ...(body.data.sshHost !== undefined ? { sshHost: body.data.sshHost } : {}),
       })
       auditService.log({
         userId: request.user.sub,

@@ -13,6 +13,7 @@ interface DbNode {
   token_secret: string
   ssh_user: string
   ssh_password: string | null
+  ssh_host: string | null
   status: string
   created_at: Date
   updated_at: Date
@@ -26,6 +27,7 @@ function toNode(row: DbNode): ProxmoxNode {
     port: row.port,
     tokenId: row.token_id,
     sshUser: row.ssh_user,
+    sshHost: row.ssh_host ?? undefined,
     status: row.status as ProxmoxNode['status'],
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
@@ -40,6 +42,7 @@ interface CreateNodeParams {
   tokenSecret: string
   sshUser?: string
   sshPassword?: string
+  sshHost?: string
 }
 
 interface UpdateNodeParams {
@@ -50,12 +53,13 @@ interface UpdateNodeParams {
   tokenSecret?: string | undefined
   sshUser?: string | undefined
   sshPassword?: string | undefined
+  sshHost?: string | undefined
 }
 
 export class NodeService {
   async list(): Promise<ProxmoxNode[]> {
     const rows = await sql<DbNode[]>`
-      SELECT id, name, host, port, token_id, token_secret, ssh_user, ssh_password, status, created_at, updated_at
+      SELECT id, name, host, port, token_id, token_secret, ssh_user, ssh_password, ssh_host, status, created_at, updated_at
       FROM nodes
       ORDER BY created_at ASC
     `
@@ -64,7 +68,7 @@ export class NodeService {
 
   async get(id: string): Promise<ProxmoxNode> {
     const rows = await sql<DbNode[]>`
-      SELECT id, name, host, port, token_id, token_secret, ssh_user, ssh_password, status, created_at, updated_at
+      SELECT id, name, host, port, token_id, token_secret, ssh_user, ssh_password, ssh_host, status, created_at, updated_at
       FROM nodes
       WHERE id = ${id}
     `
@@ -73,9 +77,9 @@ export class NodeService {
     return toNode(row)
   }
 
-  async getWithSecret(id: string): Promise<{ node: ProxmoxNode; tokenSecret: string; sshPassword: string | null }> {
+  async getWithSecret(id: string): Promise<{ node: ProxmoxNode; tokenSecret: string; sshPassword: string | null; sshHost: string | null }> {
     const rows = await sql<DbNode[]>`
-      SELECT id, name, host, port, token_id, token_secret, ssh_user, ssh_password, status, created_at, updated_at
+      SELECT id, name, host, port, token_id, token_secret, ssh_user, ssh_password, ssh_host, status, created_at, updated_at
       FROM nodes
       WHERE id = ${id}
     `
@@ -85,6 +89,7 @@ export class NodeService {
       node: toNode(row),
       tokenSecret: cryptoService.decrypt(row.token_secret),
       sshPassword: row.ssh_password ? cryptoService.decrypt(row.ssh_password) : null,
+      sshHost: row.ssh_host ?? null,
     }
   }
 
@@ -105,12 +110,12 @@ export class NodeService {
     const encryptedSshPassword = params.sshPassword ? cryptoService.encrypt(params.sshPassword) : null
 
     const rows = await sql<DbNode[]>`
-      INSERT INTO nodes (name, host, port, token_id, token_secret, ssh_user, ssh_password, status)
+      INSERT INTO nodes (name, host, port, token_id, token_secret, ssh_user, ssh_password, ssh_host, status)
       VALUES (
         ${params.name}, ${params.host}, ${params.port}, ${params.tokenId}, ${encryptedSecret},
-        ${params.sshUser ?? 'root'}, ${encryptedSshPassword}, 'online'
+        ${params.sshUser ?? 'root'}, ${encryptedSshPassword}, ${params.sshHost ?? null}, 'online'
       )
-      RETURNING id, name, host, port, token_id, token_secret, ssh_user, ssh_password, status, created_at, updated_at
+      RETURNING id, name, host, port, token_id, token_secret, ssh_user, ssh_password, ssh_host, status, created_at, updated_at
     `
     const row = rows[0]
     if (!row) throw AppError.internal('Failed to create node')
@@ -119,7 +124,7 @@ export class NodeService {
 
   async update(id: string, params: UpdateNodeParams): Promise<ProxmoxNode> {
     const existing = await sql<DbNode[]>`
-      SELECT id, name, host, port, token_id, token_secret, ssh_user, ssh_password, status, created_at, updated_at
+      SELECT id, name, host, port, token_id, token_secret, ssh_user, ssh_password, ssh_host, status, created_at, updated_at
       FROM nodes WHERE id = ${id}
     `
     const row = existing[0]
@@ -142,9 +147,10 @@ export class NodeService {
         token_secret = ${encryptedSecret},
         ssh_user     = ${params.sshUser ?? row.ssh_user},
         ssh_password = ${encryptedSshPassword},
+        ssh_host     = ${params.sshHost !== undefined ? (params.sshHost || null) : row.ssh_host},
         updated_at   = now()
       WHERE id = ${id}
-      RETURNING id, name, host, port, token_id, token_secret, ssh_user, ssh_password, status, created_at, updated_at
+      RETURNING id, name, host, port, token_id, token_secret, ssh_user, ssh_password, ssh_host, status, created_at, updated_at
     `
     const updatedRow = updated[0]
     if (!updatedRow) throw AppError.internal('Failed to update node')
@@ -175,7 +181,7 @@ export class NodeService {
     const rows = await sql<DbNode[]>`
       UPDATE nodes SET status = ${newStatus}, updated_at = now()
       WHERE id = ${id}
-      RETURNING id, name, host, port, token_id, token_secret, ssh_user, ssh_password, status, created_at, updated_at
+      RETURNING id, name, host, port, token_id, token_secret, ssh_user, ssh_password, ssh_host, status, created_at, updated_at
     `
     const row = rows[0]
     if (!row) throw AppError.notFound('Node')

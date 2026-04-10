@@ -30,6 +30,7 @@ interface ProxmoxCfg {
   nodeName: string
   sshUser?: string
   sshPassword?: string | null
+  sshHost?: string | null
 }
 
 async function exec(

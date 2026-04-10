@@ -25,6 +25,7 @@ interface CreateNodeInput {
   tokenSecret: string
   sshUser?: string
   sshPassword?: string
+  sshHost?: string
 }
 
 export function useCreateNode() {
@@ -45,6 +46,7 @@ interface UpdateNodeInput {
   tokenSecret?: string
   sshUser?: string
   sshPassword?: string
+  sshHost?: string
 }
 
 export function useUpdateNode() {

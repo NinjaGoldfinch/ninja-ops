@@ -92,7 +92,7 @@ async function runProvisioningJob(jobId: string): Promise<void> {
   const row = rows[0]
   if (!row) throw new Error(`Provisioning job ${jobId} not found`)
 
-  const { node, tokenSecret, sshPassword } = await nodeService.getWithSecret(row.node_id)
+  const { node, tokenSecret, sshPassword, sshHost } = await nodeService.getWithSecret(row.node_id)
   const cfg = {
     host: node.host,
     port: node.port,
@@ -101,6 +101,7 @@ async function runProvisioningJob(jobId: string): Promise<void> {
     nodeName: node.name,
     sshUser: node.sshUser,
     sshPassword,
+    sshHost,
   }
 
   // postgres.js auto-parses JSONB columns, but guard against it returning a raw string

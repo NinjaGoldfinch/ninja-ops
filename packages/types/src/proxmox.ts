@@ -14,6 +14,7 @@ export const ProxmoxNodeSchema = z.object({
   // tokenSecret is never exposed in responses — omitted here, stored encrypted
   // sshPassword is never exposed — stored encrypted
   sshUser: z.string().default('root'),
+  sshHost: z.string().optional(),   // overrides host for SSH; useful when API host is a public IP
   status: NodeStatusSchema,
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),

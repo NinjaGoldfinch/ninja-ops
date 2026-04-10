@@ -2,7 +2,7 @@ import { createRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { ws } from '@/lib/ws'
 import { nodeIdRoute } from '../route'
-import { useGuest, useSnapshots, useCreateSnapshot, useDeleteSnapshot } from '@/hooks/useGuests'
+import { useGuest, useSnapshots, useCreateSnapshot, useDeleteSnapshot, useDeployAgent } from '@/hooks/useGuests'
 import { useGuestMetrics } from '@/hooks/useMetrics'
 import { useAuthStore } from '@/stores/auth'
 import { useToast } from '@/components/ui/toast'
@@ -17,7 +17,7 @@ import { CpuChart } from '@/components/metrics/CpuChart'
 import { MemoryChart } from '@/components/metrics/MemoryChart'
 import { NetworkChart } from '@/components/metrics/NetworkChart'
 import { Terminal } from '@/components/terminal/Terminal'
-import { Trash2, Plus, Lock } from 'lucide-react'
+import { Trash2, Plus, Lock, Bot } from 'lucide-react'
 import { formatRelative, formatUptime } from '@/lib/utils'
 
 export const guestDetailRoute = createRoute({
@@ -35,7 +35,9 @@ function GuestDetailPage() {
   const { toast } = useToast()
   const [tab, setTab] = useState('metrics')
 
+  const isAdmin = user?.role === 'admin'
   const canTerminal = user?.role === 'admin' || user?.role === 'operator'
+  const { mutate: deployAgent, isPending: deploying } = useDeployAgent()
   const sessionId = `term-${nodeId}-${vmid}`
 
   if (error) return <QueryError error={error} onRetry={() => void refetch()} />
@@ -43,7 +45,7 @@ function GuestDetailPage() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-start gap-3">
+      <div className="flex items-start justify-between gap-3">
         {isLoading ? (
           <Skeleton className="h-7 w-48" />
         ) : guest ? (
@@ -63,6 +65,24 @@ function GuestDetailPage() {
             </p>
           </div>
         ) : null}
+
+        {isAdmin && guest?.type === 'lxc' && (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={deploying}
+            onClick={() => deployAgent(
+              { nodeId, vmid },
+              {
+                onSuccess: () => toast({ title: 'Agent deployed', variant: 'success' }),
+                onError: (err) => toast({ title: 'Deploy failed', description: String(err), variant: 'error' }),
+              },
+            )}
+          >
+            <Bot size={14} />
+            {deploying ? 'Deploying…' : 'Deploy Agent'}
+          </Button>
+        )}
       </div>
 
       {/* Tabs */}

@@ -27,6 +27,7 @@ interface ProxmoxConfig {
   nodeName: string
   sshUser?: string
   sshPassword?: string | null
+  sshHost?: string | null   // overrides host for SSH connections
 }
 
 interface ProxmoxGuestRow {
@@ -518,7 +519,7 @@ export class ProxmoxService {
       })
 
       const connectCfg: Parameters<SshClient['connect']>[0] = {
-        host: cfg.host,
+        host: cfg.sshHost ?? cfg.host,
         port: 22,
         username: cfg.sshUser ?? 'root',
         // Accept any host key — same philosophy as the HTTPS insecureAgent

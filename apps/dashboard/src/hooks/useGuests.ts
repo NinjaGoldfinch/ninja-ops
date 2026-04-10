@@ -62,6 +62,13 @@ export function useCreateSnapshot() {
   })
 }
 
+export function useDeployAgent() {
+  return useMutation({
+    mutationFn: ({ nodeId, vmid }: { nodeId: string; vmid: number }) =>
+      api.post<{ deployed: boolean }>(`/api/nodes/${nodeId}/guests/${vmid}/deploy-agent`, {}),
+  })
+}
+
 export function useDeleteSnapshot() {
   const queryClient = useQueryClient()
   return useMutation({

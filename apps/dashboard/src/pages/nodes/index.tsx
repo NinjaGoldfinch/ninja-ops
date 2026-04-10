@@ -30,10 +30,11 @@ interface NodeFormData {
   tokenSecret: string
   sshUser: string
   sshPassword: string
+  sshHost: string
 }
 
 function initialForm(): NodeFormData {
-  return { name: '', host: '', port: '8006', tokenId: '', tokenSecret: '', sshUser: 'root', sshPassword: '' }
+  return { name: '', host: '', port: '8006', tokenId: '', tokenSecret: '', sshUser: 'root', sshPassword: '', sshHost: '' }
 }
 
 function NodesPage() {
@@ -77,7 +78,7 @@ function NodesPage() {
 
   function openEdit(node: ProxmoxNode) {
     setEditingNode(node)
-    setForm({ name: node.name, host: node.host, port: String(node.port), tokenId: node.tokenId, tokenSecret: '', sshUser: node.sshUser ?? 'root', sshPassword: '' })
+    setForm({ name: node.name, host: node.host, port: String(node.port), tokenId: node.tokenId, tokenSecret: '', sshUser: node.sshUser ?? 'root', sshPassword: '', sshHost: node.sshHost ?? '' })
     setTestResult(null)
     setSheetOpen(true)
   }
@@ -100,6 +101,7 @@ function NodesPage() {
         tokenSecret: form.tokenSecret,
         sshUser: form.sshUser || 'root',
         ...(form.sshPassword ? { sshPassword: form.sshPassword } : {}),
+        ...(form.sshHost ? { sshHost: form.sshHost } : {}),
       },
       {
         onSuccess: () => {
@@ -123,6 +125,7 @@ function NodesPage() {
     if (form.tokenSecret) input.tokenSecret = form.tokenSecret
     if (form.sshUser !== (editingNode.sshUser ?? 'root')) input.sshUser = form.sshUser
     if (form.sshPassword) input.sshPassword = form.sshPassword
+    if (form.sshHost !== (editingNode.sshHost ?? '')) input.sshHost = form.sshHost
     updateNode(
       { nodeId: editingNode.id, input },
       {
@@ -262,8 +265,14 @@ function NodesPage() {
 
           <div className="rounded-md border border-zinc-200 dark:border-zinc-700 p-3 space-y-3">
             <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-              SSH credentials — required for agent deployment on Proxmox &lt; 8.1
+              SSH — required for agent deployment on Proxmox &lt; 8.1
             </p>
+            <div className="space-y-1.5">
+              <Label htmlFor="sshHost">
+                SSH Host <span className="text-zinc-400 font-normal">(leave blank to use API host)</span>
+              </Label>
+              <Input id="sshHost" value={form.sshHost} onChange={set('sshHost')} placeholder="192.168.1.x" />
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="sshUser">SSH User</Label>
