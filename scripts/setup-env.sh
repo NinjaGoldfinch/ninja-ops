@@ -388,6 +388,23 @@ printf '\n'
 if [ "$OPT_SKIP_DOCKER" -eq 0 ]; then
   if [ -f "$COMPOSE_FILE" ]; then
     run_step "Start Docker services" _step_docker
+
+    # Wait for Postgres to accept connections before proceeding
+    log_info "Waiting for Postgres to be ready..."
+    _pg_attempts=0
+    _pg_max=30
+    while [ "$_pg_attempts" -lt "$_pg_max" ]; do
+      if docker compose -f "$COMPOSE_FILE" exec -T postgres \
+           pg_isready -U ninja -d ninja_ops -q 2>/dev/null; then
+        log_ok "Postgres is ready"
+        break
+      fi
+      _pg_attempts=$((_pg_attempts + 1))
+      if [ "$_pg_attempts" -eq "$_pg_max" ]; then
+        die "Postgres did not become ready after ${_pg_max}s. Check: docker compose -f docker/docker-compose.yml logs postgres"
+      fi
+      sleep 1
+    done
   else
     log_warn "docker/docker-compose.yml not found — skipping."
     log_warn "Start Postgres and Redis manually before launching the app."
