@@ -279,14 +279,16 @@ fi
 #  4. PROMPT FOR USER-CONFIGURED VALUES
 # ─────────────────────────────────────────────────────────────────────────────
 printf '\n'
-log_info "Configure connection strings (press Enter to accept defaults):"
+log_info "Configure connection strings:"
 printf '\n'
 
 while true; do
-  prompt_default "DATABASE_URL" "postgres://ninja:ninja@localhost:5432/ninja_ops"
-  DATABASE_URL="$REPLY"
+  printf 'DATABASE_URL (e.g. postgres://ninja:ninja@localhost:5432/ninja_ops): '
+  read -r DATABASE_URL
   case "$DATABASE_URL" in
-    postgres://*) break ;;
+    postgres://?*) break ;;
+    postgres://) log_warn "DATABASE_URL cannot be empty after the scheme. Try again." ;;
+    '') log_warn "DATABASE_URL is required. Try again." ;;
     *) log_warn "DATABASE_URL must start with postgres://. Try again." ;;
   esac
 done
