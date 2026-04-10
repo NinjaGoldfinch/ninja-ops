@@ -21,6 +21,9 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   command_run: 'Ran command',
   command_create: 'Created command',
   command_delete: 'Deleted command',
+  provision_lxc: 'Provisioned LXC container',
+  provision_qemu: 'Provisioned QEMU VM',
+  provision_delete: 'Deleted provisioning job',
 }
 
 interface AuditTableProps {

@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Zap,
+  PlusSquare,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUiStore } from '@/stores/ui'
@@ -18,6 +19,7 @@ const navItems = [
   { to: '/nodes', label: 'Nodes', icon: Server },
   { to: '/deploy', label: 'Deploy', icon: GitBranch },
   { to: '/agents', label: 'Agents', icon: Bot },
+  { to: '/provision', label: 'Provision', icon: PlusSquare },
   { to: '/audit', label: 'Audit', icon: ClipboardList },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]

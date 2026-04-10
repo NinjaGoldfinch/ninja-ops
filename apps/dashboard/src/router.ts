@@ -14,6 +14,7 @@ import { jobDetailRoute } from './pages/deploy/jobs/$jobId'
 import { agentsRoute } from './pages/agents/index'
 import { auditRoute } from './pages/audit/index'
 import { settingsRoute } from './pages/settings/index'
+import { provisionRoute } from './pages/provision/index'
 
 const routeTree = rootRoute.addChildren([
   loginRoute,
@@ -28,6 +29,7 @@ const routeTree = rootRoute.addChildren([
     agentsRoute,
     auditRoute,
     settingsRoute,
+    provisionRoute,
   ]),
 ])
 
