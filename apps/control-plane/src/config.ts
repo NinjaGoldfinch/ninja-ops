@@ -21,6 +21,12 @@ const ConfigSchema = z.object({
 
   CORS_ORIGIN: z.string().optional(),
 
+  // Public URL of this control plane — used by agents to reach back home
+  CONTROL_PLANE_URL: z.string().url().optional(),
+
+  // Path to the compiled deploy-agent bundle served at GET /api/agents/download
+  AGENT_BUNDLE_PATH: z.string().default('./agent-bundle.tar.gz'),
+
   RATE_LIMIT_MAX: z.coerce.number().default(100),
   RATE_LIMIT_WINDOW: z.coerce.number().default(60_000),
 })
