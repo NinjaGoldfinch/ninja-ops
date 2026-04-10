@@ -27,11 +27,23 @@ ninja-ops/
 │   └── log-service/        # Log aggregation service (planned)
 ├── packages/
 │   └── types/              # Shared Zod schemas and TypeScript types
+├── scripts/
+│   └── setup-env.sh        # First-time environment setup
 └── docker/
     └── docker-compose.yml  # Local dev: Postgres + Redis
 ```
 
 ## Quick start
+
+### Automated (recommended)
+
+```bash
+./scripts/setup-env.sh
+```
+
+Checks prerequisites, generates secrets, writes `apps/control-plane/.env`, starts Docker, installs dependencies, and runs migrations in one step. Pass `--help` for all options.
+
+### Manual
 
 ```bash
 # 1. Install dependencies
@@ -42,8 +54,7 @@ docker compose -f docker/docker-compose.yml up -d
 
 # 3. Set up control-plane environment
 cp apps/control-plane/.env.example apps/control-plane/.env
-# Edit .env and fill in JWT_SECRET, ENCRYPTION_KEY, AGENT_SECRET, GITHUB_WEBHOOK_SECRET
-# See docs/setup.md for secret generation commands
+# Edit .env — see docs/setup.md for secret generation commands
 
 # 4. Run database migrations
 pnpm --filter @ninja/control-plane db:migrate

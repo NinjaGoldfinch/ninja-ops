@@ -8,7 +8,41 @@
 | pnpm | >= 10 | `npm install -g pnpm` |
 | Docker | any recent | [docker.com](https://www.docker.com) |
 
-## Step-by-step setup
+## Automated setup (recommended)
+
+Run the setup script from the repo root:
+
+```bash
+./scripts/setup-env.sh
+```
+
+The script will:
+1. Verify Node.js 22+, pnpm, and Docker are installed and running
+2. Auto-generate `JWT_SECRET`, `ENCRYPTION_KEY`, `AGENT_SECRET`, and `GITHUB_WEBHOOK_SECRET`
+3. Prompt for `DATABASE_URL`, `REDIS_URL`, and `CORS_ORIGIN` (with sensible defaults)
+4. Display all secrets in a bordered block so you can save them to a password manager
+5. Write `apps/control-plane/.env`
+6. Start Docker services, run `pnpm install`, `db:migrate`, and `db:seed`
+
+**Flags:**
+
+| Flag | Effect |
+|---|---|
+| `--manual` | Prompt for every secret instead of auto-generating |
+| `--skip-docker` | Do not start Docker services |
+| `--skip-install` | Do not run `pnpm install` |
+| `--skip-migrate` | Do not run `db:migrate` or `db:seed` |
+| `--force` | Overwrite an existing `.env` without prompting |
+
+Then start the dev server:
+
+```bash
+pnpm dev
+```
+
+---
+
+## Manual step-by-step setup
 
 ### 1. Install dependencies
 
@@ -32,7 +66,7 @@ This starts:
 cp apps/control-plane/.env.example apps/control-plane/.env
 ```
 
-Open `apps/control-plane/.env` and fill in the required secrets (see [Environment variables](#environment-variables) below).
+Open `apps/control-plane/.env` and fill in the required secrets (see [Environment variables](#environment-variables) below), or use `./scripts/setup-env.sh --skip-docker --skip-install --skip-migrate` to generate and write them automatically.
 
 **Generate JWT_SECRET and AGENT_SECRET** (64 hex chars each):
 ```bash
