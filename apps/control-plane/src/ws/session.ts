@@ -1,5 +1,5 @@
 import type { WebSocket } from '@fastify/websocket'
-import type { Role, GuestMetrics, NodeMetrics, DeployJob, DeployLogLine } from '@ninja/types'
+import type { Role, GuestMetrics, NodeMetrics, DeployJob, DeployLogLine, ProvisioningJob } from '@ninja/types'
 
 interface WsSession {
   ws: WebSocket
@@ -92,6 +92,14 @@ export class SessionManager {
     for (const session of this.sessions.values()) {
       if (session.deploySubscriptions.has(jobId)) {
         send(session.ws, { type: 'deploy_log', data })
+      }
+    }
+  }
+
+  broadcastProvisioningUpdate(data: ProvisioningJob): void {
+    for (const session of this.sessions.values()) {
+      if (session.userId) {
+        send(session.ws, { type: 'provisioning_update', data })
       }
     }
   }

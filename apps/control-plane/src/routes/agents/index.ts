@@ -1,8 +1,10 @@
+import fs from 'node:fs'
 import type { FastifyInstance } from 'fastify'
 import { AgentRegisterRequestSchema } from '@ninja/types'
 import { agentService } from '../../services/agent.js'
 import { requireRole } from '../../plugins/rbac.js'
 import { AppError } from '../../errors.js'
+import { config } from '../../config.js'
 
 export default async function agentRoutes(app: FastifyInstance) {
   // POST /api/agents/register
@@ -40,6 +42,22 @@ export default async function agentRoutes(app: FastifyInstance) {
       const { agentId } = request.params as { agentId: string }
       await agentService.deleteAgent(agentId)
       return reply.status(204).send()
+    },
+  )
+
+  // GET /api/agents/download — serves the compiled deploy-agent bundle (no auth)
+  app.get(
+    '/download',
+    async (_req, reply) => {
+      const bundlePath = config.AGENT_BUNDLE_PATH
+      if (!fs.existsSync(bundlePath)) {
+        throw AppError.notFound('Agent bundle')
+      }
+      const stream = fs.createReadStream(bundlePath)
+      return reply
+        .header('Content-Type', 'application/gzip')
+        .header('Content-Disposition', 'attachment; filename="agent.tar.gz"')
+        .send(stream)
     },
   )
 }
