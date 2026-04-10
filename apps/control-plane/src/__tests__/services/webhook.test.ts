@@ -69,7 +69,7 @@ describe('WebhookService.handleGithubWorkflowRun', () => {
 
   beforeEach(async () => {
     const mod = await import('../../services/deploy.js')
-    const ds = mod.deployService as { findTargetByRepoBranch: ReturnType<typeof vi.fn>; triggerDeploy: ReturnType<typeof vi.fn> }
+    const ds = mod.deployService as unknown as { findTargetByRepoBranch: ReturnType<typeof vi.fn>; triggerDeploy: ReturnType<typeof vi.fn> }
     findTarget = ds.findTargetByRepoBranch
     triggerDeploy = ds.triggerDeploy
     vi.clearAllMocks()

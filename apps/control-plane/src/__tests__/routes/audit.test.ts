@@ -13,10 +13,10 @@ import { auditService } from '../../services/audit.js'
 
 const mockAuditItems = [
   {
-    id: 'audit-1',
-    userId: 'user-1',
-    username: 'admin',
-    action: 'node_create',
+    id: '00000000-0000-0000-0000-000000000001',
+    userId: '00000000-0000-0000-0000-000000000002' as string | null,
+    username: 'admin' as string | null,
+    action: 'node_create' as const,
     resourceType: 'node',
     resourceId: 'node-1',
     meta: {},

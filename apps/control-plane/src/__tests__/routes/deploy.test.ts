@@ -36,6 +36,7 @@ const mockTarget = {
   vmid: 100,
   workingDir: '/app',
   restartCommand: 'systemctl restart app',
+  timeoutSeconds: 300,
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z',
 }
@@ -44,9 +45,17 @@ const mockJob = {
   id: 'job-uuid-1',
   targetId: 'target-uuid-1',
   state: 'queued' as const,
-  trigger: { source: 'manual' as const },
-  createdAt: '2024-01-01T00:00:00.000Z',
-  updatedAt: '2024-01-01T00:00:00.000Z',
+  trigger: {
+    source: 'manual' as const,
+    userId: '00000000-0000-0000-0000-000000000001',
+    username: 'admin',
+  },
+  agentId: null as string | null,
+  exitCode: null as number | null,
+  errorMessage: null as string | null,
+  queuedAt: '2024-01-01T00:00:00.000Z',
+  startedAt: null as string | null,
+  finishedAt: null as string | null,
 }
 
 const validTargetBody = {
@@ -327,7 +336,7 @@ describe('DELETE /api/deploy/jobs/:jobId (cancel)', () => {
 describe('GET /api/deploy/jobs/:jobId/logs', () => {
   it('returns 200 with log lines for viewer', async () => {
     vi.mocked(deployService.getJobLogs).mockResolvedValue([
-      { id: 'line-1', jobId: 'job-uuid-1', seq: 1, stream: 'stdout' as const, line: 'Starting...', createdAt: '2024-01-01T00:00:00.000Z' },
+      { jobId: 'job-uuid-1', seq: 1, stream: 'stdout' as const, line: 'Starting...', timestamp: '2024-01-01T00:00:00.000Z' },
     ])
 
     const res = await app.inject({

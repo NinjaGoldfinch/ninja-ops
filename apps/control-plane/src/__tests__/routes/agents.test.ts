@@ -28,8 +28,7 @@ const mockAgent = {
   version: '1.0.0',
   status: 'idle' as const,
   lastSeenAt: '2024-01-01T00:00:00.000Z',
-  createdAt: '2024-01-01T00:00:00.000Z',
-  updatedAt: '2024-01-01T00:00:00.000Z',
+  registeredAt: '2024-01-01T00:00:00.000Z',
 }
 
 let app: FastifyInstance
