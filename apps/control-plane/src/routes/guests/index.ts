@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { GuestTypeSchema, PowerActionRequestSchema, CreateSnapshotRequestSchema } from '@ninja/types'
+import { PowerActionRequestSchema, CreateSnapshotRequestSchema } from '@ninja/types'
 import { nodeService } from '../../services/node.js'
 import { proxmoxService } from '../../services/proxmox.js'
 import { auditService } from '../../services/audit.js'
@@ -25,6 +25,13 @@ async function getNodeConfig(nodeId: string) {
   }
 }
 
+async function resolveGuest(cfg: Awaited<ReturnType<typeof getNodeConfig>>, nodeId: string, vmid: number) {
+  const guests = await proxmoxService.listGuests(cfg, nodeId)
+  const guest = guests.find(g => g.vmid === vmid)
+  if (!guest) throw AppError.notFound(`Guest ${vmid}`)
+  return guest
+}
+
 export default async function guestRoutes(app: FastifyInstance) {
   // GET /api/nodes/:nodeId/guests
   app.get(
@@ -35,6 +42,18 @@ export default async function guestRoutes(app: FastifyInstance) {
       const cfg = await getNodeConfig(nodeId)
       const guests = await proxmoxService.listGuests(cfg, nodeId)
       return reply.send({ ok: true, data: guests })
+    },
+  )
+
+  // GET /api/nodes/:nodeId/guests/:vmid
+  app.get(
+    '/:nodeId/guests/:vmid',
+    { preHandler: [app.authenticate] },
+    async (request, reply) => {
+      const { nodeId, vmid: vmidStr } = request.params as { nodeId: string; vmid: string }
+      const cfg = await getNodeConfig(nodeId)
+      const guest = await resolveGuest(cfg, nodeId, parseInt(vmidStr, 10))
+      return reply.send({ ok: true, data: guest })
     },
   )
 
@@ -52,12 +71,8 @@ export default async function guestRoutes(app: FastifyInstance) {
       const body = PowerActionRequestSchema.safeParse(request.body)
       if (!body.success) throw validationError(body.error)
 
-      // Determine guest type from listing
       const cfg = await getNodeConfig(nodeId)
-      const guests = await proxmoxService.listGuests(cfg, nodeId)
-      const guest = guests.find(g => g.vmid === vmid)
-      if (!guest) throw AppError.notFound(`Guest ${vmid}`)
-
+      const guest = await resolveGuest(cfg, nodeId, vmid)
       await proxmoxService.powerAction(cfg, guest.type, vmid, body.data.action)
 
       auditService.log({
@@ -74,45 +89,34 @@ export default async function guestRoutes(app: FastifyInstance) {
     },
   )
 
-  // GET /api/nodes/:nodeId/guests/:type/:vmid/snapshots
+  // GET /api/nodes/:nodeId/guests/:vmid/snapshots
   app.get(
-    '/:nodeId/guests/:type/:vmid/snapshots',
+    '/:nodeId/guests/:vmid/snapshots',
     { preHandler: [app.authenticate] },
     async (request, reply) => {
-      const { nodeId, type: typeStr, vmid: vmidStr } = request.params as {
-        nodeId: string
-        type: string
-        vmid: string
-      }
-      const typeResult = GuestTypeSchema.safeParse(typeStr)
-      if (!typeResult.success) throw AppError.validationError('Invalid guest type', [])
-
+      const { nodeId, vmid: vmidStr } = request.params as { nodeId: string; vmid: string }
       const vmid = parseInt(vmidStr, 10)
       const cfg = await getNodeConfig(nodeId)
-      const snapshots = await proxmoxService.listSnapshots(cfg, typeResult.data, vmid)
+      const guest = await resolveGuest(cfg, nodeId, vmid)
+      const snapshots = await proxmoxService.listSnapshots(cfg, guest.type, vmid)
       return reply.send({ ok: true, data: snapshots })
     },
   )
 
-  // POST /api/nodes/:nodeId/guests/:type/:vmid/snapshots
+  // POST /api/nodes/:nodeId/guests/:vmid/snapshots
   app.post(
-    '/:nodeId/guests/:type/:vmid/snapshots',
+    '/:nodeId/guests/:vmid/snapshots',
     { preHandler: [app.authenticate, requireRole('operator')] },
     async (request, reply) => {
-      const { nodeId, type: typeStr, vmid: vmidStr } = request.params as {
-        nodeId: string
-        type: string
-        vmid: string
-      }
-      const typeResult = GuestTypeSchema.safeParse(typeStr)
-      if (!typeResult.success) throw AppError.validationError('Invalid guest type', [])
-
+      const { nodeId, vmid: vmidStr } = request.params as { nodeId: string; vmid: string }
       const vmid = parseInt(vmidStr, 10)
+
       const body = CreateSnapshotRequestSchema.safeParse(request.body)
       if (!body.success) throw validationError(body.error)
 
       const cfg = await getNodeConfig(nodeId)
-      await proxmoxService.createSnapshot(cfg, typeResult.data, vmid, body.data)
+      const guest = await resolveGuest(cfg, nodeId, vmid)
+      await proxmoxService.createSnapshot(cfg, guest.type, vmid, body.data)
 
       auditService.log({
         userId: request.user.sub,
@@ -128,23 +132,20 @@ export default async function guestRoutes(app: FastifyInstance) {
     },
   )
 
-  // DELETE /api/nodes/:nodeId/guests/:type/:vmid/snapshots/:name
+  // DELETE /api/nodes/:nodeId/guests/:vmid/snapshots/:name
   app.delete(
-    '/:nodeId/guests/:type/:vmid/snapshots/:name',
+    '/:nodeId/guests/:vmid/snapshots/:name',
     { preHandler: [app.authenticate, requireRole('operator')] },
     async (request, reply) => {
-      const { nodeId, type: typeStr, vmid: vmidStr, name } = request.params as {
+      const { nodeId, vmid: vmidStr, name } = request.params as {
         nodeId: string
-        type: string
         vmid: string
         name: string
       }
-      const typeResult = GuestTypeSchema.safeParse(typeStr)
-      if (!typeResult.success) throw AppError.validationError('Invalid guest type', [])
-
       const vmid = parseInt(vmidStr, 10)
       const cfg = await getNodeConfig(nodeId)
-      await proxmoxService.deleteSnapshot(cfg, typeResult.data, vmid, name)
+      const guest = await resolveGuest(cfg, nodeId, vmid)
+      await proxmoxService.deleteSnapshot(cfg, guest.type, vmid, name)
 
       auditService.log({
         userId: request.user.sub,
