@@ -1,5 +1,5 @@
 import { Queue, Worker } from 'bullmq'
-import { redis } from '../db/redis.js'
+import { bullmqConnection } from '../db/redis.js'
 import { deployService } from '../services/deploy.js'
 import { agentService } from '../services/agent.js'
 import { sessionManager } from '../ws/session.js'
@@ -15,7 +15,7 @@ export function getDeployQueue(): Queue {
 }
 
 export async function startDeployWorker(): Promise<void> {
-  const connection = redis
+  const connection = bullmqConnection
 
   deployQueue = new Queue(DEPLOY_QUEUE_NAME, { connection })
 

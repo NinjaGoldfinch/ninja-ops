@@ -1,5 +1,5 @@
 import { Queue, Worker } from 'bullmq'
-import { redis } from '../db/redis.js'
+import { bullmqConnection } from '../db/redis.js'
 import { sql } from '../db/client.js'
 import { proxmoxService } from '../services/proxmox.js'
 import { cryptoService } from '../services/crypto.js'
@@ -56,7 +56,7 @@ async function pollMetrics(): Promise<void> {
 }
 
 export async function startWorkers(): Promise<void> {
-  const connection = redis
+  const connection = bullmqConnection
 
   metricsQueue = new Queue(QUEUE_NAME, { connection })
 
