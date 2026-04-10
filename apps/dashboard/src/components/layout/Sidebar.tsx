@@ -9,7 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Zap,
-  PlusSquare,
+  Layers,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUiStore } from '@/stores/ui'
@@ -17,9 +17,9 @@ import { useUiStore } from '@/stores/ui'
 const navItems = [
   { to: '/', label: 'Overview', icon: LayoutDashboard },
   { to: '/nodes', label: 'Nodes', icon: Server },
+  { to: '/containers', label: 'Containers', icon: Layers },
   { to: '/deploy', label: 'Deploy', icon: GitBranch },
   { to: '/agents', label: 'Agents', icon: Bot },
-  { to: '/provision', label: 'Provision', icon: PlusSquare },
   { to: '/audit', label: 'Audit', icon: ClipboardList },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]

@@ -42,13 +42,18 @@ const OS_TYPES = [
   { value: 'other', label: 'Other' },
 ]
 
-export function QemuForm() {
+interface QemuFormProps {
+  defaultNodeId?: string
+  onSuccess?: () => void
+}
+
+export function QemuForm({ defaultNodeId, onSuccess }: QemuFormProps) {
   const { data: nodes } = useNodes()
   const { mutate: create, isPending } = useCreateQemu()
   const { toast } = useToast()
 
   const [form, setForm] = useState<FormState>({
-    nodeId: '', vmid: '', name: '', osType: 'l26', isoImage: '', tags: '',
+    nodeId: defaultNodeId ?? '', vmid: '', name: '', osType: 'l26', isoImage: '', tags: '',
     cores: '2', sockets: '1', memory: '2048', diskSize: '32', storage: '',
     diskFormat: 'raw', bridge: 'vmbr0', netModel: 'virtio', bios: 'seabios',
     startOnBoot: true, startAfterCreate: false,
@@ -121,6 +126,7 @@ export function QemuForm() {
       onSuccess: (job) => {
         toast({ title: 'Provisioning started', description: `Job ${job.id.slice(0, 8)} created`, variant: 'success' })
         setForm(f => ({ ...f, name: '', vmid: '', isoImage: '', tags: '' }))
+        onSuccess?.()
       },
       onError: (err) => {
         if (err instanceof ApiRequestError && err.code === 'VALIDATION_ERROR') {

@@ -39,13 +39,18 @@ type FieldErrors = Partial<Record<keyof FormState | 'form', string>>
 
 const HOSTNAME_RE = /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$/
 
-export function LxcForm() {
+interface LxcFormProps {
+  defaultNodeId?: string
+  onSuccess?: () => void
+}
+
+export function LxcForm({ defaultNodeId, onSuccess }: LxcFormProps) {
   const { data: nodes } = useNodes()
   const { mutate: create, isPending } = useCreateLxc()
   const { toast } = useToast()
 
   const [form, setForm] = useState<FormState>({
-    nodeId: '', vmid: '', hostname: '', osTemplate: '', tags: '',
+    nodeId: defaultNodeId ?? '', vmid: '', hostname: '', osTemplate: '', tags: '',
     cores: '1', memory: '512', swap: '512', diskSize: '8', storage: '',
     bridge: 'vmbr0', ipType: 'dhcp', address: '', prefix: '24', gateway: '',
     dns: '', password: '', confirmPassword: '', sshPublicKey: '',
@@ -137,6 +142,7 @@ export function LxcForm() {
       onSuccess: (job) => {
         toast({ title: 'Provisioning started', description: `Job ${job.id.slice(0, 8)} created`, variant: 'success' })
         setForm(f => ({ ...f, hostname: '', vmid: '', osTemplate: '', password: '', confirmPassword: '', tags: '' }))
+        onSuccess?.()
       },
       onError: (err) => {
         if (err instanceof ApiRequestError && err.code === 'VALIDATION_ERROR') {
