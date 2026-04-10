@@ -1,6 +1,26 @@
+import { networkInterfaces } from 'os'
 import { proxmoxService } from './proxmox.js'
 import { config } from '../config.js'
 import { AppError } from '../errors.js'
+
+function resolveControlPlaneUrl(): string {
+  if (config.CONTROL_PLANE_URL) return config.CONTROL_PLANE_URL
+
+  // Auto-detect: find the first non-loopback IPv4 address on this host
+  const nets = networkInterfaces()
+  for (const iface of Object.values(nets)) {
+    if (!iface) continue
+    for (const net of iface) {
+      if (net.family === 'IPv4' && !net.internal) {
+        return `http://${net.address}:${config.PORT}`
+      }
+    }
+  }
+
+  throw AppError.internal(
+    'Cannot determine CONTROL_PLANE_URL — no non-loopback IPv4 address found. Set CONTROL_PLANE_URL explicitly in your env.',
+  )
+}
 
 interface ProxmoxCfg {
   host: string
@@ -28,10 +48,7 @@ export async function deployAgentIntoLxc(
   vmid: number,
   nodeId: string,
 ): Promise<void> {
-  if (!config.CONTROL_PLANE_URL) {
-    throw AppError.internal('CONTROL_PLANE_URL is not configured — cannot deploy agent into LXC')
-  }
-  const controlPlaneUrl = config.CONTROL_PLANE_URL
+  const controlPlaneUrl = resolveControlPlaneUrl()
 
   // Step 1 — detect Node.js; install if missing
   const nodeCheck = await proxmoxService.execInLxc(cfg, vmid, ['node', '--version'])
