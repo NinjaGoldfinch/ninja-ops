@@ -372,6 +372,12 @@ mkdir -p "$(dirname "$ENV_FILE")"
 } > "$ENV_FILE"
 
 log_ok "Written to apps/control-plane/.env"
+
+# Export collected values so child processes (migrate, seed) can read them
+# without needing a dotenv loader — migrate.ts reads process.env directly.
+export DATABASE_URL REDIS_URL JWT_SECRET ENCRYPTION_KEY \
+       AGENT_SECRET GITHUB_WEBHOOK_SECRET CORS_ORIGIN
+
 printf '\n'
 
 # ─────────────────────────────────────────────────────────────────────────────
