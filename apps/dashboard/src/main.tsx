@@ -6,6 +6,7 @@ import { ToastProvider } from '@/components/ui/toast'
 import { router } from '@/router'
 import { ws } from '@/lib/ws'
 import { useAuthStore } from '@/stores/auth'
+import { startMetricsListener } from '@/stores/metrics'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -17,7 +18,8 @@ const queryClient = new QueryClient({
   },
 })
 
-// If we have a token on startup, connect WS
+// Start global metrics listener and connect WS if already authenticated
+startMetricsListener()
 if (useAuthStore.getState().token) {
   ws.connect()
 }
