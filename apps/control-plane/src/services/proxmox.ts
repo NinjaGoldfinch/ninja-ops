@@ -48,25 +48,40 @@ function apiBase(cfg: ProxmoxConfig): string {
   return `https://${cfg.host}:${cfg.port}/api2/json`
 }
 
-function headers(cfg: ProxmoxConfig): Record<string, string> {
-  return {
-    Authorization: `PVEAPIToken=${cfg.tokenId}=${cfg.tokenSecret}`,
-    'Content-Type': 'application/json',
+function authHeader(cfg: ProxmoxConfig): Record<string, string> {
+  return { Authorization: `PVEAPIToken=${cfg.tokenId}=${cfg.tokenSecret}` }
+}
+
+// Proxmox REST API expects application/x-www-form-urlencoded for POST/PUT bodies.
+// Despite the /api2/json path, it does not reliably parse a JSON request body.
+function toFormBody(body: Record<string, unknown>): URLSearchParams {
+  const params = new URLSearchParams()
+  for (const [k, v] of Object.entries(body)) {
+    if (v === undefined || v === null) continue
+    if (Array.isArray(v)) {
+      // Repeated keys for array params (e.g. command[]=bash&command[]=-c)
+      for (const item of v) {
+        params.append(k, String(item))
+      }
+    } else {
+      params.set(k, String(v))
+    }
   }
+  return params
 }
 
 async function proxmoxFetch<T>(
   url: string,
   cfg: ProxmoxConfig,
-  options: { method?: string; body?: unknown } = {},
+  options: { method?: string; body?: Record<string, unknown> } = {},
 ): Promise<T> {
   const fetchOptions: Parameters<typeof undiciFetch>[1] = {
     method: options.method ?? 'GET',
-    headers: headers(cfg),
+    headers: authHeader(cfg),
     dispatcher: insecureAgent,
   }
   if (options.body !== undefined) {
-    fetchOptions.body = JSON.stringify(options.body)
+    fetchOptions.body = toFormBody(options.body)
   }
   const response = await undiciFetch(url, fetchOptions)
 
