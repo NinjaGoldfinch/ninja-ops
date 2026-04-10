@@ -28,6 +28,8 @@ interface ProxmoxCfg {
   tokenId: string
   tokenSecret: string
   nodeName: string
+  sshUser?: string
+  sshPassword?: string | null
 }
 
 async function exec(
@@ -36,11 +38,19 @@ async function exec(
   command: string[],
   description: string,
 ): Promise<void> {
-  const { upid } = await proxmoxService.execInLxc(cfg, vmid, command)
-  await proxmoxService.waitForTask(cfg, upid, { timeoutMs: 120_000 })
-    .catch(() => {
+  try {
+    // PVE 8.1+ REST API
+    const { upid } = await proxmoxService.execInLxc(cfg, vmid, command)
+    await proxmoxService.waitForTask(cfg, upid, { timeoutMs: 120_000 })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (msg.includes('501')) {
+      // Pre-8.1 Proxmox: fall back to SSH pct exec
+      await proxmoxService.sshPctExec(cfg, vmid, command)
+    } else {
       throw AppError.internal(`Agent deployment step failed: ${description}`)
-    })
+    }
+  }
 }
 
 export async function deployAgentIntoLxc(
@@ -51,11 +61,8 @@ export async function deployAgentIntoLxc(
   const controlPlaneUrl = resolveControlPlaneUrl()
 
   // Step 1 — detect Node.js; install if missing
-  const nodeCheck = await proxmoxService.execInLxc(cfg, vmid, ['node', '--version'])
-  try {
-    await proxmoxService.waitForTask(cfg, nodeCheck.upid, { timeoutMs: 15_000 })
-  } catch {
-    // Node.js not found — install it
+  const hasNode = await exec(cfg, vmid, ['node', '--version'], 'check Node.js').then(() => true).catch(() => false)
+  if (!hasNode) {
     await exec(
       cfg, vmid,
       ['bash', '-c',

@@ -1,3 +1,4 @@
+import { Client as SshClient } from 'ssh2'
 import { Agent, fetch as undiciFetch } from 'undici'
 import type {
   Guest,
@@ -24,6 +25,8 @@ interface ProxmoxConfig {
   tokenId: string
   tokenSecret: string
   nodeName: string
+  sshUser?: string
+  sshPassword?: string | null
 }
 
 interface ProxmoxGuestRow {
@@ -448,6 +451,71 @@ export class ProxmoxService {
       cfg,
       { method: 'POST', body: { command } },
     )
+  }
+
+  /**
+   * SSH into the Proxmox host and run `pct exec <vmid> -- <command>`.
+   * Used as a fallback when the /exec REST API is unavailable (pre-PVE 8.1).
+   */
+  sshPctExec(
+    cfg: ProxmoxConfig,
+    vmid: number,
+    command: string[],
+    timeoutMs = 120_000,
+  ): Promise<void> {
+    if (!cfg.sshPassword) {
+      throw AppError.internal(
+        'SSH fallback requires sshPassword — configure it on the node to use pct exec on pre-8.1 Proxmox',
+      )
+    }
+
+    // Shell-quote each argument (wrap in single quotes, escape internal single quotes)
+    const shellQuote = (s: string) => `'${s.replace(/'/g, "'\\''")}'`
+    const cmdStr = `pct exec ${vmid} -- ${command.map(shellQuote).join(' ')}`
+
+    return new Promise((resolve, reject) => {
+      const conn = new SshClient()
+      const timer = setTimeout(() => {
+        conn.end()
+        reject(AppError.internal(`SSH pct exec timed out after ${timeoutMs}ms: ${cmdStr}`))
+      }, timeoutMs)
+
+      conn.on('ready', () => {
+        conn.exec(cmdStr, (err, stream) => {
+          if (err) {
+            clearTimeout(timer)
+            conn.end()
+            return reject(AppError.internal(`SSH exec failed: ${err.message}`))
+          }
+          let stderr = ''
+          stream.stderr.on('data', (d: Buffer) => { stderr += d.toString() })
+          stream.on('close', (code: number) => {
+            clearTimeout(timer)
+            conn.end()
+            if (code === 0) {
+              resolve()
+            } else {
+              reject(AppError.internal(`pct exec exited ${code}: ${stderr.trim()}`))
+            }
+          })
+        })
+      })
+
+      conn.on('error', (err) => {
+        clearTimeout(timer)
+        reject(AppError.internal(`SSH connection failed: ${err.message}`))
+      })
+
+      const connectCfg: Parameters<SshClient['connect']>[0] = {
+        host: cfg.host,
+        port: 22,
+        username: cfg.sshUser ?? 'root',
+        // Accept any host key — same philosophy as the HTTPS insecureAgent
+        hostVerifier: () => true,
+      }
+      if (cfg.sshPassword) connectCfg.password = cfg.sshPassword
+      conn.connect(connectCfg)
+    })
   }
 }
 

@@ -28,10 +28,12 @@ interface NodeFormData {
   port: string
   tokenId: string
   tokenSecret: string
+  sshUser: string
+  sshPassword: string
 }
 
 function initialForm(): NodeFormData {
-  return { name: '', host: '', port: '8006', tokenId: '', tokenSecret: '' }
+  return { name: '', host: '', port: '8006', tokenId: '', tokenSecret: '', sshUser: 'root', sshPassword: '' }
 }
 
 function NodesPage() {
@@ -75,7 +77,7 @@ function NodesPage() {
 
   function openEdit(node: ProxmoxNode) {
     setEditingNode(node)
-    setForm({ name: node.name, host: node.host, port: String(node.port), tokenId: node.tokenId, tokenSecret: '' })
+    setForm({ name: node.name, host: node.host, port: String(node.port), tokenId: node.tokenId, tokenSecret: '', sshUser: node.sshUser ?? 'root', sshPassword: '' })
     setTestResult(null)
     setSheetOpen(true)
   }
@@ -96,6 +98,8 @@ function NodesPage() {
         port: Number(form.port) || 8006,
         tokenId: form.tokenId,
         tokenSecret: form.tokenSecret,
+        sshUser: form.sshUser || 'root',
+        ...(form.sshPassword ? { sshPassword: form.sshPassword } : {}),
       },
       {
         onSuccess: () => {
@@ -117,6 +121,8 @@ function NodesPage() {
     if (Number(form.port) !== editingNode.port) input.port = Number(form.port) || 8006
     if (form.tokenId !== editingNode.tokenId) input.tokenId = form.tokenId
     if (form.tokenSecret) input.tokenSecret = form.tokenSecret
+    if (form.sshUser !== (editingNode.sshUser ?? 'root')) input.sshUser = form.sshUser
+    if (form.sshPassword) input.sshPassword = form.sshPassword
     updateNode(
       { nodeId: editingNode.id, input },
       {
@@ -252,6 +258,24 @@ function NodesPage() {
               placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
               required={!editingNode}
             />
+          </div>
+
+          <div className="rounded-md border border-zinc-200 dark:border-zinc-700 p-3 space-y-3">
+            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+              SSH credentials — required for agent deployment on Proxmox &lt; 8.1
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="sshUser">SSH User</Label>
+                <Input id="sshUser" value={form.sshUser} onChange={set('sshUser')} placeholder="root" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="sshPassword">
+                  SSH Password{editingNode && <span className="ml-1 text-zinc-400 font-normal">(leave blank to keep)</span>}
+                </Label>
+                <Input id="sshPassword" type="password" value={form.sshPassword} onChange={set('sshPassword')} placeholder="••••••••" />
+              </div>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">

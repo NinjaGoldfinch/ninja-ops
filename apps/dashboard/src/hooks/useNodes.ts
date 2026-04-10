@@ -23,6 +23,8 @@ interface CreateNodeInput {
   port: number
   tokenId: string
   tokenSecret: string
+  sshUser?: string
+  sshPassword?: string
 }
 
 export function useCreateNode() {
@@ -41,6 +43,8 @@ interface UpdateNodeInput {
   port?: number
   tokenId?: string
   tokenSecret?: string
+  sshUser?: string
+  sshPassword?: string
 }
 
 export function useUpdateNode() {

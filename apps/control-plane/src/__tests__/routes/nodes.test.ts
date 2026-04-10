@@ -47,6 +47,7 @@ const mockNode = {
   host: '10.0.0.1',
   port: 8006,
   tokenId: 'root@pam!mytoken',
+  sshUser: 'root',
   status: 'online' as const,
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z',

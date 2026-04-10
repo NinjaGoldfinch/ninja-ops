@@ -12,6 +12,8 @@ export const ProxmoxNodeSchema = z.object({
   port: z.number().int().min(1).max(65535).default(8006),
   tokenId: z.string().min(1),     // e.g. manager@pve!app
   // tokenSecret is never exposed in responses — omitted here, stored encrypted
+  // sshPassword is never exposed — stored encrypted
+  sshUser: z.string().default('root'),
   status: NodeStatusSchema,
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
