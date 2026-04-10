@@ -57,7 +57,7 @@ docker compose -f docker/docker-compose.yml up -d
 ```
 
 This starts:
-- PostgreSQL 16 on `localhost:5432` (user: `ninja`, password: `ninja`, db: `ninja_ops`)
+- PostgreSQL 18 on `localhost:5432` (user: `ninja`, password: `ninja`, db: `ninja_ops`)
 - Redis 7 on `localhost:6379`
 
 ### 3. Configure environment
@@ -180,7 +180,7 @@ All variables for `apps/control-plane/.env`:
 
 | Service | Image | Port | Credentials |
 |---|---|---|---|
-| PostgreSQL | `postgres:16-alpine` | 5432 | user: `ninja`, password: `ninja`, db: `ninja_ops` |
+| PostgreSQL | `postgres:18-alpine` | 5432 | user: `ninja`, password: `ninja`, db: `ninja_ops` |
 | Redis | `redis:7-alpine` | 6379 | No auth |
 
 Data is persisted in named Docker volumes (`postgres_data`, `redis_data`).

@@ -11,7 +11,7 @@ Self-hosted Proxmox management and deployment platform. Manage VMs and LXC conta
 | Language | TypeScript (strict, ESM) |
 | Validation | Zod 3 |
 | API | Fastify 5 (REST + WebSocket) |
-| Database | PostgreSQL 16 (postgres.js) |
+| Database | PostgreSQL 18 (postgres.js) |
 | Cache / queues | Redis 7 + BullMQ |
 | Testing | Vitest |
 

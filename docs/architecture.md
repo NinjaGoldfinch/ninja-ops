@@ -12,7 +12,7 @@ graph TB
         Routes["Routes (thin)"]
         Services["Services (logic)"]
         Workers["Workers\nmetrics-poller · deploy-runner"]
-        PG[("PostgreSQL 16")]
+        PG[("PostgreSQL 18")]
         Redis[("Redis 7 + BullMQ")]
 
         Routes --> Services
