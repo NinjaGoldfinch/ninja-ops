@@ -366,8 +366,19 @@ export class ProxmoxService {
       )
 
       if (status.status === 'stopped') {
-        if (status.exitstatus === 'OK') return
-        throw AppError.proxmoxError(`Proxmox task failed: ${status.exitstatus ?? 'unknown error'}`)
+        // 'OK' = clean success; 'WARNINGS: N' = completed with non-fatal warnings — both are fine
+        if (status.exitstatus === 'OK' || status.exitstatus?.startsWith('WARNINGS:')) return
+
+        // Fetch the task log to surface the actual error message
+        const log = await proxmoxFetch<Array<{ t: string; n: number }>>(
+          `${apiBase(cfg)}/nodes/${cfg.nodeName}/tasks/${encodedUpid}/log?limit=50`,
+          cfg,
+        ).catch(() => [] as Array<{ t: string; n: number }>)
+        const logText = log.map(l => l.t).join('\n').trim()
+
+        throw AppError.proxmoxError(
+          `Proxmox task failed (${status.exitstatus ?? 'unknown'})${logText ? `:\n${logText}` : ''}`,
+        )
       }
 
       await new Promise(resolve => setTimeout(resolve, pollIntervalMs))
