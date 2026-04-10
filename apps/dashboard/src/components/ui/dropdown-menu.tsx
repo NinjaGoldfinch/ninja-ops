@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { cn } from '@/lib/utils'
 
 interface DropdownMenuProps {
@@ -9,11 +10,17 @@ interface DropdownMenuProps {
 
 export function DropdownMenu({ trigger, children, align = 'right' }: DropdownMenuProps) {
   const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
+  const [coords, setCoords] = useState({ top: 0, left: 0, right: 0 })
+  const triggerRef = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      const target = e.target as Node
+      if (
+        triggerRef.current && !triggerRef.current.contains(target) &&
+        menuRef.current && !menuRef.current.contains(target)
+      ) {
         setOpen(false)
       }
     }
@@ -21,22 +28,42 @@ export function DropdownMenu({ trigger, children, align = 'right' }: DropdownMen
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  function handleTriggerClick() {
+    if (!open && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      setCoords({
+        top: rect.bottom + window.scrollY + 4,
+        left: rect.left + window.scrollX,
+        right: window.innerWidth - rect.right - window.scrollX,
+      })
+    }
+    setOpen((v) => !v)
+  }
+
   return (
-    <div ref={ref} className="relative inline-block">
-      <div onClick={() => setOpen((v) => !v)}>{trigger}</div>
-      {open && (
+    <>
+      <div ref={triggerRef} className="inline-block" onClick={handleTriggerClick}>
+        {trigger}
+      </div>
+      {open && createPortal(
         <div
+          ref={menuRef}
+          style={{
+            position: 'absolute',
+            top: coords.top,
+            ...(align === 'right' ? { right: coords.right } : { left: coords.left }),
+          }}
           className={cn(
-            'absolute z-50 mt-1 min-w-36 rounded-md border border-zinc-200 dark:border-zinc-700',
+            'z-[9999] min-w-36 rounded-md border border-zinc-200 dark:border-zinc-700',
             'bg-white dark:bg-zinc-900 shadow-lg py-1',
-            align === 'right' ? 'right-0' : 'left-0',
           )}
           onClick={() => setOpen(false)}
         >
           {children}
-        </div>
+        </div>,
+        document.body,
       )}
-    </div>
+    </>
   )
 }
 

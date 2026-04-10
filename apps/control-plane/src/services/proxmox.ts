@@ -239,10 +239,17 @@ export class ProxmoxService {
       netout?: number
     }
 
-    const guestStats = await proxmoxFetch<ProxmoxGuestStats[]>(
-      `${apiBase(cfg)}/nodes/${cfg.nodeName}/qemu?full=1`,
-      cfg,
-    ).catch(() => [] as ProxmoxGuestStats[])
+    const [qemuStats, lxcStats] = await Promise.all([
+      proxmoxFetch<ProxmoxGuestStats[]>(
+        `${apiBase(cfg)}/nodes/${cfg.nodeName}/qemu`,
+        cfg,
+      ).catch(() => [] as ProxmoxGuestStats[]),
+      proxmoxFetch<ProxmoxGuestStats[]>(
+        `${apiBase(cfg)}/nodes/${cfg.nodeName}/lxc`,
+        cfg,
+      ).catch(() => [] as ProxmoxGuestStats[]),
+    ])
+    const guestStats = [...qemuStats, ...lxcStats]
 
     const guests: GuestMetrics[] = guestStats.map(g => ({
       vmid: g.vmid,
