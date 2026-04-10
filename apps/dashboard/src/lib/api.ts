@@ -36,6 +36,10 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     throw new ApiRequestError('UNAUTHORIZED', 'Session expired')
   }
 
+  if (response.status === 204) {
+    return undefined as T
+  }
+
   const data = (await response.json()) as { ok: boolean; data?: T } & ApiError
 
   if (!response.ok || !data.ok) {

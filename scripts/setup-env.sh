@@ -2,11 +2,11 @@
 # setup-env.sh — First-time environment setup for ninja-ops
 # POSIX sh compatible (bash, dash, ash, etc.)
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ENV_FILE="$SCRIPT_DIR/apps/control-plane/.env"
-ENV_BAK="$SCRIPT_DIR/apps/control-plane/.env.bak"
-AGENT_ENV_FILE="$SCRIPT_DIR/apps/deploy-agent/.env"
-COMPOSE_FILE="$SCRIPT_DIR/docker/docker-compose.yml"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ENV_FILE="$REPO_ROOT/env/control-plane.env"
+ENV_BAK="$REPO_ROOT/env/control-plane.env.bak"
+AGENT_ENV_FILE="$REPO_ROOT/env/deploy-agent.env"
+COMPOSE_FILE="$REPO_ROOT/docker/docker-compose.yml"
 
 # Port is written into .env as a fixed default; used in summary URLs
 PORT=3000
@@ -176,9 +176,9 @@ run_step() {
 
 # ── Step wrappers (subshells so cd does not affect the script) ────────────────
 _step_docker()  { docker compose -f "$COMPOSE_FILE" up -d; }
-_step_install() { ( cd "$SCRIPT_DIR" && pnpm install ); }
-_step_migrate() { ( cd "$SCRIPT_DIR" && pnpm --filter @ninja/control-plane db:migrate ); }
-_step_seed()    { ( cd "$SCRIPT_DIR" && pnpm --filter @ninja/control-plane db:seed ); }
+_step_install() { ( cd "$REPO_ROOT" && pnpm install ); }
+_step_migrate() { ( cd "$REPO_ROOT" && pnpm --filter @ninja/control-plane db:migrate ); }
+_step_seed()    { ( cd "$REPO_ROOT" && pnpm --filter @ninja/control-plane db:seed ); }
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  1. PREREQUISITE CHECKS
@@ -222,9 +222,9 @@ if [ -f "$ENV_FILE" ]; then
     log_warn "Overwriting existing .env (--force)"
   else
     printf '\n'
-    log_warn "apps/control-plane/.env already exists."
+    log_warn "env/control-plane.env already exists."
     printf '  %s[o]%s Overwrite\n'                    "$C_YLW" "$C_RST"
-    printf '  %s[b]%s Back up to .env.bak and overwrite\n' "$C_YLW" "$C_RST"
+    printf '  %s[b]%s Back up to env/control-plane.env.bak and overwrite\n' "$C_YLW" "$C_RST"
     printf '  %s[a]%s Abort\n'                         "$C_YLW" "$C_RST"
     printf 'Choose [o/b/a]: '
     read -r _choice
@@ -234,7 +234,7 @@ if [ -f "$ENV_FILE" ]; then
         ;;
       b|B)
         cp "$ENV_FILE" "$ENV_BAK"
-        log_ok "Backed up to apps/control-plane/.env.bak"
+        log_ok "Backed up to env/control-plane.env.bak"
         ;;
       *)
         die "Aborted by user."
@@ -331,7 +331,7 @@ printf '\n'
 # ─────────────────────────────────────────────────────────────────────────────
 #  6. WRITE .env FILE
 # ─────────────────────────────────────────────────────────────────────────────
-log_info "Writing apps/control-plane/.env..."
+log_info "Writing env/control-plane.env..."
 
 mkdir -p "$(dirname "$ENV_FILE")"
 
@@ -372,12 +372,12 @@ mkdir -p "$(dirname "$ENV_FILE")"
   printf 'RATE_LIMIT_WINDOW=60000\n'
 } > "$ENV_FILE"
 
-log_ok "Written to apps/control-plane/.env"
+log_ok "Written to env/control-plane.env"
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  6b. WRITE deploy-agent .env FILE
 # ─────────────────────────────────────────────────────────────────────────────
-log_info "Writing apps/deploy-agent/.env..."
+log_info "Writing env/deploy-agent.env..."
 
 mkdir -p "$(dirname "$AGENT_ENV_FILE")"
 
@@ -409,8 +409,8 @@ mkdir -p "$(dirname "$AGENT_ENV_FILE")"
   printf '# LOG_LEVEL=info\n'
 } > "$AGENT_ENV_FILE"
 
-log_ok "Written to apps/deploy-agent/.env"
-log_warn "Fill in NODE_ID and VMID in apps/deploy-agent/.env before running the agent."
+log_ok "Written to env/deploy-agent.env"
+log_warn "Fill in NODE_ID and VMID in env/deploy-agent.env before running the agent."
 
 # Export collected values so child processes (migrate, seed) can read them
 # without needing a dotenv loader — migrate.ts reads process.env directly.
@@ -475,7 +475,7 @@ printf '\n'
 log_ok "Done. Run ${C_BLD}pnpm dev${C_RST} to start the development server."
 log_info "API will be available at http://localhost:${PORT}"
 log_info "Docs at http://localhost:${PORT}/api/docs"
-log_info "Agent .env written — set NODE_ID and VMID in apps/deploy-agent/.env before running the agent."
+log_info "Agent .env written — set NODE_ID and VMID in env/deploy-agent.env before running the agent."
 
 # ── External IP detection ─────────────────────────────────────────────────────
 # Collect non-loopback, non-link-local IPv4 addresses via `ip` or `ifconfig`
