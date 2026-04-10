@@ -31,9 +31,9 @@ graph TB
     CP -- "WebSocket (/ws/agent)" --> Agent3
 
     subgraph Proxmox["Proxmox cluster(s)"]
-        Agent1["deploy-agent (planned)"] --> VM1["LXC / VM"]
-        Agent2["deploy-agent (planned)"] --> VM2["LXC / VM"]
-        Agent3["deploy-agent (planned)"] --> VM3["LXC / VM"]
+        Agent1["deploy-agent"] --> VM1["LXC / VM"]
+        Agent2["deploy-agent"] --> VM2["LXC / VM"]
+        Agent3["deploy-agent"] --> VM3["LXC / VM"]
     end
 ```
 
