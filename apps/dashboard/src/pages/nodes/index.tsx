@@ -61,11 +61,10 @@ function NodesPage() {
   function handleTest() {
     testConnection(
       {
-        name: form.name || 'test',
         host: form.host,
         port: Number(form.port) || 8006,
         tokenId: form.tokenId,
-        tokenSecret: form.tokenSecret,
+        ...(form.tokenSecret ? { tokenSecret: form.tokenSecret } : editingNode ? { nodeId: editingNode.id } : {}),
       },
       {
         onSuccess: () => setTestResult(true),

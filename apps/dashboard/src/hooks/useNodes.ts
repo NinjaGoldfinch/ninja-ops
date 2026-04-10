@@ -64,9 +64,17 @@ export function useDeleteNode() {
   })
 }
 
+interface TestConnectionInput {
+  host: string
+  port: number
+  tokenId: string
+  tokenSecret?: string
+  nodeId?: string
+}
+
 export function useTestNodeConnection() {
   return useMutation({
-    mutationFn: (input: CreateNodeInput) => api.post<{ success: boolean }>('/api/nodes/test', input),
+    mutationFn: (input: TestConnectionInput) => api.post<{ success: boolean }>('/api/nodes/test', input),
   })
 }
 

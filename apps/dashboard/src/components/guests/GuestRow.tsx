@@ -61,7 +61,7 @@ export function GuestRow({ guest, nodeId, canPower }: GuestRowProps) {
       <td className="px-4 py-2.5 font-mono text-xs text-zinc-500 dark:text-zinc-400 w-20">
         {guest.uptime ? formatUptime(guest.uptime) : '—'}
       </td>
-      <td className="px-4 py-2.5 w-20">
+      <td className="px-4 py-2.5 whitespace-nowrap">
         <div className="flex items-center gap-1">
           <Link to="/nodes/$nodeId/guests/$vmid" params={{ nodeId, vmid: String(guest.vmid) }}>
             <Button variant="ghost" size="icon" aria-label="View detail">

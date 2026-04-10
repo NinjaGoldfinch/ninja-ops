@@ -26,7 +26,9 @@ const TestConnectionSchema = z.object({
   host: z.string().min(1),
   port: z.number().int().default(8006),
   tokenId: z.string().min(1),
-  tokenSecret: z.string().min(1),
+  // When editing an existing node, tokenSecret may be omitted and nodeId provided instead
+  tokenSecret: z.string().min(1).optional(),
+  nodeId: z.string().uuid().optional(),
 })
 
 function validationError(error: z.ZodError) {
@@ -131,7 +133,15 @@ export default async function nodeRoutes(app: FastifyInstance) {
       const body = TestConnectionSchema.safeParse(request.body)
       if (!body.success) throw validationError(body.error)
 
-      await proxmoxService.testConnection(body.data)
+      let tokenSecret = body.data.tokenSecret
+      if (!tokenSecret) {
+        if (!body.data.nodeId) {
+          throw AppError.validationError('tokenSecret or nodeId required', [])
+        }
+        const stored = await nodeService.getWithSecret(body.data.nodeId)
+        tokenSecret = stored.tokenSecret
+      }
+      await proxmoxService.testConnection({ ...body.data, tokenSecret })
       return reply.send({ ok: true, data: { connected: true } })
     },
   )
