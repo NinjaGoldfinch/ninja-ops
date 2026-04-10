@@ -28,12 +28,8 @@ declare module 'fastify' {
 
 export default fp(async function authPlugin(app: FastifyInstance) {
   // Fastify v5 reference types require a getter factory; authenticate prehandler sets the real value
-  app.decorateRequest('user', {
-    getter(): JwtPayload {
-      // Will be replaced by the authenticate prehandler before any route handler runs
-      return null as unknown as JwtPayload
-    },
-  })
+  // Use null as placeholder; authenticate prehandler sets the real value before any route handler runs
+  app.decorateRequest('user', null as unknown as JwtPayload)
 
   app.decorate(
     'authenticate',

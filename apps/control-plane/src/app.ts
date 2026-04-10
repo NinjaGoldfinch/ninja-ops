@@ -46,30 +46,7 @@ export async function buildApp() {
     },
   )
 
-  // Plugins (order matters)
-  await app.register(corsPlugin)
-  await app.register(rateLimitPlugin)
-  await app.register(authPlugin)
-  await app.register(swaggerPlugin)
-
-  // Routes
-  await app.register(authRoutes, { prefix: '/api/auth' })
-  await app.register(nodeRoutes, { prefix: '/api/nodes' })
-  await app.register(guestRoutes, { prefix: '/api/nodes' })
-  await app.register(deployTargetRoutes, { prefix: '/api/deploy/targets' })
-  await app.register(deployJobRoutes, { prefix: '/api/deploy/jobs' })
-  await app.register(githubWebhookRoutes, { prefix: '/api/webhooks' })
-  await app.register(agentRoutes, { prefix: '/api/agents' })
-  await app.register(auditRoutes, { prefix: '/api/audit' })
-
-  // WebSocket endpoints
-  await app.register(registerWebSocket)
-  await app.register(registerAgentWebSocket)
-
-  // Health check — no auth required
-  app.get('/healthz', async () => ({ ok: true }))
-
-  // Global error handler
+  // Global error handler — must be registered before route plugins so child scopes inherit it
   app.setErrorHandler((error: FastifyError | AppError | Error, _req, reply) => {
     if (error instanceof AppError) {
       const body: ApiError = {
@@ -95,6 +72,29 @@ export async function buildApp() {
     const body: ApiError = { ok: false, code: 'INTERNAL_ERROR', message: 'Internal server error' }
     return reply.status(500).send(body)
   })
+
+  // Plugins (order matters)
+  await app.register(corsPlugin)
+  await app.register(rateLimitPlugin)
+  await app.register(authPlugin)
+  await app.register(swaggerPlugin)
+
+  // Routes
+  await app.register(authRoutes, { prefix: '/api/auth' })
+  await app.register(nodeRoutes, { prefix: '/api/nodes' })
+  await app.register(guestRoutes, { prefix: '/api/nodes' })
+  await app.register(deployTargetRoutes, { prefix: '/api/deploy/targets' })
+  await app.register(deployJobRoutes, { prefix: '/api/deploy/jobs' })
+  await app.register(githubWebhookRoutes, { prefix: '/api/webhooks' })
+  await app.register(agentRoutes, { prefix: '/api/agents' })
+  await app.register(auditRoutes, { prefix: '/api/audit' })
+
+  // WebSocket endpoints
+  await app.register(registerWebSocket)
+  await app.register(registerAgentWebSocket)
+
+  // Health check — no auth required
+  app.get('/healthz', async () => ({ ok: true }))
 
   return app
 }
