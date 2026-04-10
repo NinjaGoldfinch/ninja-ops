@@ -256,6 +256,7 @@ export class ProxmoxService {
   }
 
   async createLxc(cfg: ProxmoxConfig, params: LxcCreateRequest, vmid: number): Promise<string> {
+    if (!params.ipConfig) throw new Error('LXC config is missing ipConfig')
     const ipConfig = params.ipConfig.type === 'dhcp'
       ? `name=eth0,bridge=${params.bridge},ip=dhcp`
       : `name=eth0,bridge=${params.bridge},ip=${params.ipConfig.address}/${params.ipConfig.prefix},gw=${params.ipConfig.gateway}`

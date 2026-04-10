@@ -91,7 +91,10 @@ async function runProvisioningJob(jobId: string): Promise<void> {
     nodeName: node.name,
   }
 
-  const params = row.config
+  // postgres.js auto-parses JSONB columns, but guard against it returning a raw string
+  const params = (typeof row.config === 'string'
+    ? JSON.parse(row.config)
+    : row.config) as LxcCreateRequest | QemuCreateRequest
 
   // pending → creating
   const upid = row.guest_type === 'lxc'
