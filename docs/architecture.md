@@ -2,37 +2,39 @@
 
 ## System overview
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                        Browser                          │
-│              dashboard (React/Vite) [planned]           │
-└────────────────────────┬────────────────────────────────┘
-                         │ REST + WebSocket (/ws)
-┌────────────────────────▼────────────────────────────────┐
-│                   control-plane                         │
-│              Fastify 5  ·  Node.js 22                   │
-│                                                         │
-│  ┌──────────┐  ┌──────────┐  ┌────────────────────────┐ │
-│  │  Routes  │  │ Services │  │       Workers          │ │
-│  │  (thin)  │→ │ (logic)  │  │  metrics-poller (5s)  │ │
-│  └──────────┘  └────┬─────┘  │  deploy-runner        │ │
-│                     │        └────────────────────────┘ │
-│  ┌──────────────────▼──────────────────────────────┐    │
-│  │  PostgreSQL 16         Redis 7 + BullMQ          │    │
-│  └─────────────────────────────────────────────────┘    │
-└────────────────────────┬────────────────────────────────┘
-                         │ WebSocket (/ws/agent)
-         ┌───────────────┼───────────────┐
-         ▼               ▼               ▼
-   ┌───────────┐   ┌───────────┐   ┌───────────┐
-   │  agent    │   │  agent    │   │  agent    │
-   │ (planned) │   │ (planned) │   │ (planned) │
-   └─────┬─────┘   └─────┬─────┘   └─────┬─────┘
-         │               │               │
-   ┌─────▼─────┐   ┌─────▼─────┐   ┌─────▼─────┐
-   │ LXC / VM  │   │ LXC / VM  │   │ LXC / VM  │
-   └───────────┘   └───────────┘   └───────────┘
-                 Proxmox cluster(s)
+```mermaid
+graph TB
+    Browser["Browser\ndashboard · React/Vite (planned)"]
+    ForgeCLI["forge-cli (planned)\nCLI · manual deploys & node mgmt"]
+    LogService["log-service (planned)\nVector → Loki"]
+
+    subgraph CP["control-plane · Fastify 5 · Node.js 22"]
+        Routes["Routes (thin)"]
+        Services["Services (logic)"]
+        Workers["Workers\nmetrics-poller · deploy-runner"]
+        PG[("PostgreSQL 16")]
+        Redis[("Redis 7 + BullMQ")]
+
+        Routes --> Services
+        Services --> PG
+        Services --> Redis
+        Workers --> Redis
+        Workers --> Services
+    end
+
+    Browser -- "REST + WebSocket (/ws)" --> CP
+    ForgeCLI -- "REST" --> CP
+    LogService -. "planned" .-> CP
+
+    CP -- "WebSocket (/ws/agent)" --> Agent1
+    CP -- "WebSocket (/ws/agent)" --> Agent2
+    CP -- "WebSocket (/ws/agent)" --> Agent3
+
+    subgraph Proxmox["Proxmox cluster(s)"]
+        Agent1["deploy-agent (planned)"] --> VM1["LXC / VM"]
+        Agent2["deploy-agent (planned)"] --> VM2["LXC / VM"]
+        Agent3["deploy-agent (planned)"] --> VM3["LXC / VM"]
+    end
 ```
 
 **forge-cli** (planned) — CLI for manual deploys and node management, talks to the control-plane REST API.
