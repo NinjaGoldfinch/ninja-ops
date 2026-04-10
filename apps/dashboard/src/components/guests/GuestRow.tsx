@@ -23,10 +23,15 @@ const statusConfig = {
 
 export function GuestRow({ guest, nodeId, canPower }: GuestRowProps) {
   const { latest } = useGuestMetrics(nodeId, guest.vmid)
-  const statusCfg = statusConfig[guest.status]
+
+  // Prefer live metrics values; fall back to REST snapshot
+  const liveStatus = latest?.status ?? guest.status
+  const liveUptime = latest?.uptime ?? guest.uptime ?? 0
+  const statusCfg = statusConfig[liveStatus] ?? statusConfig.unknown
+  const isStopped = liveStatus === 'stopped'
 
   const memPct =
-    latest && latest.maxmem > 0
+    !isStopped && latest && latest.maxmem > 0
       ? Math.round((latest.mem / latest.maxmem) * 100)
       : null
 
@@ -46,20 +51,23 @@ export function GuestRow({ guest, nodeId, canPower }: GuestRowProps) {
       <td className="px-4 py-2.5">
         <Badge variant={statusCfg.variant}>
           <span className={`h-1.5 w-1.5 rounded-full ${
-            guest.status === 'running' ? 'bg-green-500' :
-            guest.status === 'paused' ? 'bg-amber-500' : 'bg-zinc-400'
+            liveStatus === 'running' ? 'bg-green-500' :
+            liveStatus === 'paused' ? 'bg-amber-500' : 'bg-zinc-400'
           }`} />
           {statusCfg.label}
         </Badge>
       </td>
       <td className="px-4 py-2.5 w-32">
-        <GuestMetricsSparkline nodeId={nodeId} vmid={guest.vmid} />
+        {isStopped
+          ? <span className="font-mono text-xs text-zinc-400 line-through">N/A</span>
+          : <GuestMetricsSparkline nodeId={nodeId} vmid={guest.vmid} />
+        }
       </td>
       <td className="px-4 py-2.5 font-mono text-xs text-zinc-600 dark:text-zinc-400 w-16">
-        {memPct !== null ? `${memPct}%` : '—'}
+        {isStopped ? <span className="text-zinc-400">—</span> : memPct !== null ? `${memPct}%` : '—'}
       </td>
       <td className="px-4 py-2.5 font-mono text-xs text-zinc-500 dark:text-zinc-400 w-20">
-        {guest.uptime ? formatUptime(guest.uptime) : '—'}
+        {liveUptime > 0 ? formatUptime(liveUptime) : '—'}
       </td>
       <td className="px-4 py-2.5 whitespace-nowrap">
         <div className="flex items-center gap-1">

@@ -30,7 +30,7 @@ function GuestDetailPage() {
   const { nodeId, vmid: vmidStr } = guestDetailRoute.useParams()
   const vmid = Number(vmidStr)
   const { data: guest, isLoading, error, refetch } = useGuest(nodeId, vmid)
-  const { history } = useGuestMetrics(nodeId, vmid)
+  const { latest, history } = useGuestMetrics(nodeId, vmid)
   const { user } = useAuthStore()
   const { toast } = useToast()
   const [tab, setTab] = useState('metrics')
@@ -51,13 +51,15 @@ function GuestDetailPage() {
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{guest.name}</h2>
               <Badge variant="outline" className="font-mono text-xs uppercase">{guest.type}</Badge>
-              <Badge variant={guest.status === 'running' ? 'success' : 'secondary'}>
-                {guest.status}
+              <Badge variant={(latest?.status ?? guest.status) === 'running' ? 'success' : 'secondary'}>
+                {latest?.status ?? guest.status}
               </Badge>
             </div>
             <p className="text-xs font-mono text-zinc-500 dark:text-zinc-400 mt-1">
               VMID {guest.vmid}
-              {guest.uptime ? ` · Uptime ${formatUptime(guest.uptime)}` : ''}
+              {(latest?.uptime ?? guest.uptime)
+                ? ` · Uptime ${formatUptime(latest?.uptime ?? guest.uptime ?? 0)}`
+                : ''}
             </p>
           </div>
         ) : null}

@@ -230,6 +230,8 @@ export class ProxmoxService {
     interface ProxmoxGuestStats {
       vmid: number
       type: string
+      status?: string
+      uptime?: number
       cpu?: number
       mem?: number
       maxmem?: number
@@ -251,10 +253,13 @@ export class ProxmoxService {
     ])
     const guestStats = [...qemuStats, ...lxcStats]
 
+    const VALID_STATES = new Set(['running', 'stopped', 'paused'])
     const guests: GuestMetrics[] = guestStats.map(g => ({
       vmid: g.vmid,
       nodeId,
       timestamp: new Date().toISOString(),
+      status: (VALID_STATES.has(g.status ?? '') ? g.status : 'unknown') as GuestMetrics['status'],
+      uptime: g.uptime ?? 0,
       cpu: g.cpu ?? 0,
       mem: g.mem ?? 0,
       maxmem: g.maxmem ?? 0,

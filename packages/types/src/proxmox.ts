@@ -62,6 +62,8 @@ export const GuestMetricsSchema = z.object({
   vmid: z.number().int().positive(),
   nodeId: z.string().uuid(),
   timestamp: z.string().datetime(),
+  status: PowerStateSchema,
+  uptime: z.number().nonnegative(),
   cpu: z.number().min(0).max(1),          // fraction 0–1
   mem: z.number().nonnegative(),          // bytes used
   maxmem: z.number().nonnegative(),       // bytes total
