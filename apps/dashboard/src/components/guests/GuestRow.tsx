@@ -2,7 +2,6 @@ import { Link } from '@tanstack/react-router'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { PowerActionMenu } from './PowerActionMenu'
-import { GuestMetricsSparkline } from './GuestMetricsSparkline'
 import { formatUptime } from '@/lib/utils'
 import { useGuestMetrics } from '@/hooks/useMetrics'
 import { Eye } from 'lucide-react'
@@ -30,10 +29,10 @@ export function GuestRow({ guest, nodeId, canPower }: GuestRowProps) {
   const statusCfg = statusConfig[liveStatus] ?? statusConfig.unknown
   const isStopped = liveStatus === 'stopped'
 
-  const memPct =
-    !isStopped && latest && latest.maxmem > 0
-      ? Math.round((latest.mem / latest.maxmem) * 100)
-      : null
+  const cpuPct = !isStopped && latest ? Math.round(latest.cpu * 100) : null
+  const memPct = !isStopped && latest && latest.maxmem > 0
+    ? Math.round((latest.mem / latest.maxmem) * 100)
+    : null
 
   return (
     <tr className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
@@ -57,14 +56,11 @@ export function GuestRow({ guest, nodeId, canPower }: GuestRowProps) {
           {statusCfg.label}
         </Badge>
       </td>
-      <td className="px-4 py-2.5 w-32">
-        {isStopped
-          ? <span className="font-mono text-xs text-zinc-400 line-through">N/A</span>
-          : <GuestMetricsSparkline nodeId={nodeId} vmid={guest.vmid} />
-        }
+      <td className="px-4 py-2.5 font-mono text-xs text-zinc-600 dark:text-zinc-400 w-16">
+        {cpuPct !== null ? `${cpuPct}%` : '—'}
       </td>
       <td className="px-4 py-2.5 font-mono text-xs text-zinc-600 dark:text-zinc-400 w-16">
-        {isStopped ? <span className="text-zinc-400">—</span> : memPct !== null ? `${memPct}%` : '—'}
+        {memPct !== null ? `${memPct}%` : '—'}
       </td>
       <td className="px-4 py-2.5 font-mono text-xs text-zinc-500 dark:text-zinc-400 w-20">
         {liveUptime > 0 ? formatUptime(liveUptime) : '—'}
