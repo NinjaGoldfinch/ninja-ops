@@ -3,6 +3,7 @@ import { GithubWorkflowRunPayloadSchema } from '@ninja/types'
 import { deployService } from './deploy.js'
 import { config } from '../config.js'
 import { AppError } from '../errors.js'
+import { getDeployQueue } from '../workers/deploy-runner.js'
 
 export class WebhookService {
   verifyGithubSignature(body: Buffer, signatureHeader: string): void {
@@ -45,7 +46,7 @@ export class WebhookService {
       return { triggered: false }
     }
 
-    await deployService.triggerDeploy(target.id, {
+    const job = await deployService.triggerDeploy(target.id, {
       source: 'github_webhook',
       repository: repo,
       branch,
@@ -55,6 +56,8 @@ export class WebhookService {
         : {}),
       workflowRunId: payload.workflow_run.id,
     })
+
+    await getDeployQueue().add('deploy', { jobId: job.id })
 
     return { triggered: true }
   }

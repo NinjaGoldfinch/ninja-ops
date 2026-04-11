@@ -1,35 +1,36 @@
 #!/usr/bin/env node
 /**
- * Builds the deploy-agent tarball served by the control plane at GET /api/agents/download.
- * Output: agent-bundle.tar.gz in the repo root (matches AGENT_BUNDLE_PATH default).
- *
- * Usage:
- *   pnpm package:agent
- *   pnpm --filter @ninja/deploy-agent package
+ * Packages the pre-bundled deploy-agent into a tarball.
+ * Run via `pnpm package:agent` — esbuild must have already written dist-bundle/index.js.
+ * Output: apps/control-plane/agent-bundle.tar.gz
  */
 import { execSync } from 'child_process'
-import { existsSync, mkdirSync } from 'fs'
+import { existsSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(__dirname, '..')
 const agentDir = resolve(repoRoot, 'apps/deploy-agent')
-const distDir = resolve(agentDir, 'dist')
-const outFile = resolve(repoRoot, 'agent-bundle.tar.gz')
+const bundleDir = resolve(agentDir, 'dist-bundle')
+const outFile = resolve(repoRoot, 'apps/control-plane/agent-bundle.tar.gz')
 
-if (!existsSync(distDir)) {
-  console.error('✗ apps/deploy-agent/dist not found — run `pnpm --filter @ninja/deploy-agent build` first')
+if (!existsSync(resolve(bundleDir, 'index.js'))) {
+  console.error('✗ apps/deploy-agent/dist-bundle/index.js not found — esbuild step must have failed')
   process.exit(1)
 }
 
-console.log('→ Packaging deploy-agent…')
+console.log('→ Packaging tarball…')
 
-// Include dist/ and package.json so the agent can resolve its own version
+// Strip macOS extended attributes (com.apple.provenance etc.) before taring
+if (process.platform === 'darwin') {
+  execSync(`xattr -cr "${bundleDir}"`, { stdio: 'inherit' })
+}
+
+// COPYFILE_DISABLE=1 prevents macOS copyfile resource forks
 execSync(
-  `tar -czf "${outFile}" -C "${agentDir}" dist package.json`,
-  { stdio: 'inherit' },
+  `tar -czf "${outFile}" -C "${bundleDir}" index.js`,
+  { stdio: 'inherit', env: { ...process.env, COPYFILE_DISABLE: '1' } },
 )
 
 console.log(`✓ Agent bundle written to ${outFile}`)
-console.log('  Set AGENT_BUNDLE_PATH in env/control-plane.env if needed (default: ./agent-bundle.tar.gz)')

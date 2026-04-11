@@ -2,6 +2,7 @@ import { sql } from '../db/client.js'
 import { signToken } from '../plugins/auth.js'
 import { AppError } from '../errors.js'
 import { config } from '../config.js'
+import { sessionManager } from '../ws/session.js'
 import type { Agent, AgentRegisterRequest, AgentRegisterResponse, AgentHeartbeat, AgentCommand } from '@ninja/types'
 import type { WebSocket } from '@fastify/websocket'
 
@@ -63,14 +64,26 @@ export class AgentService {
 
   markConnected(agentId: string, ws: WebSocket): void {
     connectedAgents.set(agentId, ws)
-    sql`UPDATE agents SET status = 'idle', last_seen_at = now() WHERE id = ${agentId}`.catch(
+    sql<DbAgent[]>`
+      UPDATE agents SET status = 'idle', last_seen_at = now()
+      WHERE id = ${agentId}
+      RETURNING id, node_id, vmid, hostname, version, status, last_seen_at, registered_at
+    `.then(rows => {
+      if (rows[0]) sessionManager.broadcastAgentStatus(toAgent(rows[0]))
+    }).catch(
       (err: Error) => console.error('[agent] Failed to mark connected:', err.message),
     )
   }
 
   markDisconnected(agentId: string): void {
     connectedAgents.delete(agentId)
-    sql`UPDATE agents SET status = 'offline', last_seen_at = now() WHERE id = ${agentId}`.catch(
+    sql<DbAgent[]>`
+      UPDATE agents SET status = 'offline', last_seen_at = now()
+      WHERE id = ${agentId}
+      RETURNING id, node_id, vmid, hostname, version, status, last_seen_at, registered_at
+    `.then(rows => {
+      if (rows[0]) sessionManager.broadcastAgentStatus(toAgent(rows[0]))
+    }).catch(
       (err: Error) => console.error('[agent] Failed to mark disconnected:', err.message),
     )
   }
@@ -86,15 +99,17 @@ export class AgentService {
   sendCommand(agentId: string, command: AgentCommand): void {
     const ws = connectedAgents.get(agentId)
     if (!ws) throw AppError.agentOffline(-1)
-    ws.send(JSON.stringify({ type: 'command', command }))
+    ws.send(JSON.stringify({ type: 'command', payload: command }))
   }
 
   async handleHeartbeat(heartbeat: AgentHeartbeat): Promise<void> {
-    await sql`
+    const rows = await sql<DbAgent[]>`
       UPDATE agents
       SET status = ${heartbeat.status}, last_seen_at = now()
       WHERE id = ${heartbeat.agentId}
+      RETURNING id, node_id, vmid, hostname, version, status, last_seen_at, registered_at
     `
+    if (rows[0]) sessionManager.broadcastAgentStatus(toAgent(rows[0]))
   }
 
   async getAgentForVmid(nodeId: string, vmid: number): Promise<Agent | null> {

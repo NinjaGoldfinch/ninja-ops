@@ -11,9 +11,10 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { LxcForm } from '@/pages/provision/LxcForm'
 import { QemuForm } from '@/pages/provision/QemuForm'
+import { DeployTargetForm } from '@/pages/containers/DeployTargetForm'
 import { useAuthStore } from '@/stores/auth'
 import { cn } from '@/lib/utils'
-import { Plus, Server } from 'lucide-react'
+import { Plus, Server, GitBranch } from 'lucide-react'
 
 export const containersRoute = createRoute({
   getParentRoute: () => layoutRoute,
@@ -28,6 +29,7 @@ function ContainersPage() {
   const [selectedNodeId, setSelectedNodeId] = useState<string>('')
   const [sheetOpen, setSheetOpen] = useState(false)
   const [newGuestType, setNewGuestType] = useState<GuestTypeTab>('lxc')
+  const [deploySheetOpen, setDeploySheetOpen] = useState(false)
 
   const isAdmin = useAuthStore(s => s.user?.role === 'admin')
   const canPower = useAuthStore(s => {
@@ -62,6 +64,10 @@ function ContainersPage() {
         </div>
         {isAdmin && activeNodeId && (
           <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => setDeploySheetOpen(true)}>
+              <GitBranch size={14} />
+              New Deploy Target
+            </Button>
             <Button size="sm" variant="outline" onClick={() => openSheet('qemu')}>
               <Plus size={14} />
               New VM
@@ -117,6 +123,7 @@ function ContainersPage() {
             nodeId={activeNodeId}
             isLoading={guestsLoading}
             canPower={canPower}
+            isAdmin={isAdmin}
           />
 
           {/* Provisioning jobs for this node */}
@@ -152,6 +159,23 @@ function ContainersPage() {
           )}
         </>
       )}
+
+      {/* Deploy target sheet */}
+      <Sheet
+        open={deploySheetOpen}
+        onClose={() => setDeploySheetOpen(false)}
+        title="New Deploy Target"
+        description={`Map a repository branch to a container on ${activeNode?.name ?? 'a node'} for automated deploys.`}
+        className="max-w-2xl"
+      >
+        {nodes && (
+          <DeployTargetForm
+            nodes={nodes}
+            defaultNodeId={activeNodeId}
+            onSuccess={() => setDeploySheetOpen(false)}
+          />
+        )}
+      </Sheet>
 
       {/* Provision sheet */}
       <Sheet

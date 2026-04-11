@@ -1,5 +1,8 @@
 import { existsSync } from 'fs'
+import { initLogInterceptor } from './lib/log-interceptor.js'
 import { buildApp } from './app.js'
+
+initLogInterceptor()
 import { config } from './config.js'
 import { connectRedis, closeRedis } from './db/redis.js'
 import { closeDb } from './db/client.js'

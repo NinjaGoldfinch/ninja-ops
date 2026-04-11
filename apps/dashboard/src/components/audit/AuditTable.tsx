@@ -25,6 +25,7 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   provision_qemu: 'Provisioned QEMU VM',
   provision_delete: 'Deleted provisioning job',
   agent_deploy: 'Deployed agent',
+  guest_delete: 'Deleted guest',
 }
 
 interface AuditTableProps {

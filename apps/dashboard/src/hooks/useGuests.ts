@@ -2,6 +2,17 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import type { Guest, PowerAction, Snapshot, CreateSnapshotRequest } from '@ninja/types'
 
+export function useDeleteGuest() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ nodeId, vmid }: { nodeId: string; vmid: number }) =>
+      api.delete<void>(`/api/nodes/${nodeId}/guests/${vmid}`),
+    onSuccess: (_data, { nodeId }) => {
+      void queryClient.invalidateQueries({ queryKey: ['guests', nodeId] })
+    },
+  })
+}
+
 export function useGuests(nodeId: string) {
   return useQuery({
     queryKey: ['guests', nodeId],
@@ -63,9 +74,13 @@ export function useCreateSnapshot() {
 }
 
 export function useDeployAgent() {
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({ nodeId, vmid }: { nodeId: string; vmid: number }) =>
-      api.post<{ deployed: boolean }>(`/api/nodes/${nodeId}/guests/${vmid}/deploy-agent`, {}),
+      api.post<{ deployed: boolean; sessionId: string }>(`/api/nodes/${nodeId}/guests/${vmid}/deploy-agent`, {}),
+    onSuccess: (_data, { nodeId, vmid }) => {
+      void queryClient.invalidateQueries({ queryKey: ['job-logs', 'job', 'agent_deploy', `${nodeId}/${vmid}`] })
+    },
   })
 }
 

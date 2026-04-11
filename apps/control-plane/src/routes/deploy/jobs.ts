@@ -5,6 +5,7 @@ import { deployService } from '../../services/deploy.js'
 import { auditService } from '../../services/audit.js'
 import { AppError } from '../../errors.js'
 import { requireRole } from '../../plugins/rbac.js'
+import { getDeployQueue } from '../../workers/deploy-runner.js'
 
 const TriggerJobSchema = z.object({
   targetId: z.string().uuid(),
@@ -52,6 +53,8 @@ export default async function deployJobRoutes(app: FastifyInstance) {
         userId: request.user.sub,
         username: request.user.username,
       })
+
+      await getDeployQueue().add('deploy', { jobId: job.id })
 
       auditService.log({
         userId: request.user.sub,

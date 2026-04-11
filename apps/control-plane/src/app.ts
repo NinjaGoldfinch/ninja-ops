@@ -17,6 +17,7 @@ import githubWebhookRoutes from './routes/webhooks/github.js'
 import agentRoutes from './routes/agents/index.js'
 import auditRoutes from './routes/audit/index.js'
 import provisioningRoutes from './routes/provisioning/index.js'
+import diagnosticsRoutes from './routes/diagnostics/index.js'
 import { registerWebSocket } from './ws/router.js'
 import { registerAgentWebSocket } from './ws/agent-router.js'
 
@@ -92,6 +93,7 @@ export async function buildApp() {
   await app.register(agentRoutes, { prefix: '/api/agents' })
   await app.register(auditRoutes, { prefix: '/api/audit' })
   await app.register(provisioningRoutes, { prefix: '/api/provisioning' })
+  await app.register(diagnosticsRoutes, { prefix: '/api/diagnostics' })
 
   // WebSocket endpoints
   await app.register(registerWebSocket)

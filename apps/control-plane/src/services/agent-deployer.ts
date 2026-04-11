@@ -2,6 +2,7 @@ import { networkInterfaces } from 'os'
 import { proxmoxService } from './proxmox.js'
 import { config } from '../config.js'
 import { AppError } from '../errors.js'
+import { JobLogger } from './job-logger.js'
 
 function resolveControlPlaneUrl(): string {
   if (config.CONTROL_PLANE_URL) return config.CONTROL_PLANE_URL
@@ -38,19 +39,29 @@ async function exec(
   vmid: number,
   command: string[],
   description: string,
+  logger?: JobLogger,
 ): Promise<void> {
+  const tag = `[agent-deployer] [${description}]`
+  const logInfo = (msg: string) => logger ? logger.info(msg) : console.log(msg)
+  const logError = (msg: string) => logger ? logger.error(msg) : console.error(msg)
+
+  logInfo(`${tag} start: pct exec ${vmid} -- ${command.join(' ')}`)
   try {
-    // PVE 8.1+ REST API
-    const { upid } = await proxmoxService.execInLxc(cfg, vmid, command)
-    await proxmoxService.waitForTask(cfg, upid, { timeoutMs: 120_000 })
+    const exitCode = await proxmoxService.sshPctExecStreaming(
+      cfg,
+      vmid,
+      command,
+      (data) => logger ? logger.write('stdout', data) : process.stdout.write(`${tag} stdout: ${data}`),
+      (data) => logger ? logger.write('stderr', data) : process.stderr.write(`${tag} stderr: ${data}`),
+    )
+    if (exitCode !== 0) {
+      throw AppError.internal(`pct exec exited ${exitCode}`)
+    }
+    logInfo(`${tag} done (exit 0)`)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    if (msg.includes('501')) {
-      // Pre-8.1 Proxmox: fall back to SSH pct exec
-      await proxmoxService.sshPctExec(cfg, vmid, command)
-    } else {
-      throw AppError.internal(`Agent deployment step failed: ${description}`)
-    }
+    logError(`${tag} failed: ${msg}`)
+    throw AppError.internal(`Agent deployment step failed: ${description} — ${msg}`)
   }
 }
 
@@ -58,11 +69,28 @@ export async function deployAgentIntoLxc(
   cfg: ProxmoxCfg,
   vmid: number,
   nodeId: string,
+  logger?: JobLogger,
 ): Promise<void> {
   const controlPlaneUrl = resolveControlPlaneUrl()
 
+  // Step 0 — ensure locale is configured (avoids perl/apt warnings in LXC containers)
+  // Non-fatal: locale warnings don't prevent the agent from running
+  await exec(
+    cfg, vmid,
+    ['bash', '-c',
+      'apt-get install -y -qq locales 2>/dev/null && ' +
+      'locale-gen en_US.UTF-8 2>/dev/null && ' +
+      'update-locale LANG=en_US.UTF-8 2>/dev/null || true',
+    ],
+    'configure locale',
+    logger,
+  ).catch(() => {
+    const warn = '[agent-deployer] locale setup skipped (non-fatal)\n'
+    logger ? logger.write('stderr', warn) : process.stderr.write(warn)
+  })
+
   // Step 1 — detect Node.js; install if missing
-  const hasNode = await exec(cfg, vmid, ['node', '--version'], 'check Node.js').then(() => true).catch(() => false)
+  const hasNode = await exec(cfg, vmid, ['node', '--version'], 'check Node.js', logger).then(() => true).catch(() => false)
   if (!hasNode) {
     await exec(
       cfg, vmid,
@@ -72,42 +100,48 @@ export async function deployAgentIntoLxc(
         'apt-get install -y -qq nodejs',
       ],
       'install Node.js 22',
+      logger,
     )
   }
 
   // Step 2 — create agent directory
-  await exec(cfg, vmid, ['mkdir', '-p', '/opt/ninja-agent'], 'create agent directory')
+  await exec(cfg, vmid, ['mkdir', '-p', '/opt/ninja-agent'], 'create agent directory', logger)
 
   // Step 3 — download agent archive
   await exec(
     cfg, vmid,
     ['bash', '-c', `curl -fsSL ${controlPlaneUrl}/api/agents/download -o /opt/ninja-agent/agent.tar.gz`],
     'download agent archive',
+    logger,
   )
 
-  // Step 4 — extract
+  // Step 4 — extract (bundle is a single index.js at the tarball root)
   await exec(
     cfg, vmid,
-    ['bash', '-c', 'cd /opt/ninja-agent && tar -xzf agent.tar.gz --strip-components=1'],
+    ['bash', '-c', 'tar -xzf /opt/ninja-agent/agent.tar.gz -C /opt/ninja-agent'],
     'extract agent archive',
+    logger,
   )
 
   // Step 5 — write .env
+  // Base64-encode content so newlines survive pct exec argument passing
   const envContent = [
     `NODE_ID=${nodeId}`,
     `VMID=${vmid}`,
     `CONTROL_PLANE_URL=${controlPlaneUrl}`,
     `AGENT_SECRET=${config.AGENT_SECRET}`,
-  ].join('\n')
+  ].join('\n') + '\n'
+  const envB64 = Buffer.from(envContent).toString('base64')
 
   await exec(
     cfg, vmid,
-    ['bash', '-c', `cat > /opt/ninja-agent/.env << 'ENVEOF'\n${envContent}\nENVEOF`],
+    ['bash', '-c', `echo '${envB64}' | base64 -d > /opt/ninja-agent/.env`],
     'write .env file',
+    logger,
   )
 
   // Step 6 — write systemd unit
-  const unit = [
+  const unitContent = [
     '[Unit]',
     'Description=Ninja Deploy Agent',
     'After=network.target',
@@ -116,18 +150,20 @@ export async function deployAgentIntoLxc(
     'Type=simple',
     'WorkingDirectory=/opt/ninja-agent',
     'EnvironmentFile=/opt/ninja-agent/.env',
-    'ExecStart=/usr/bin/node /opt/ninja-agent/dist/index.js',
+    'ExecStart=/usr/bin/node /opt/ninja-agent/index.js',
     'Restart=always',
     'RestartSec=5',
     '',
     '[Install]',
     'WantedBy=multi-user.target',
-  ].join('\n')
+  ].join('\n') + '\n'
+  const unitB64 = Buffer.from(unitContent).toString('base64')
 
   await exec(
     cfg, vmid,
-    ['bash', '-c', `cat > /etc/systemd/system/ninja-agent.service << 'UNITEOF'\n${unit}\nUNITEOF`],
+    ['bash', '-c', `echo '${unitB64}' | base64 -d > /etc/systemd/system/ninja-agent.service`],
     'write systemd unit',
+    logger,
   )
 
   // Step 7 — enable and start
@@ -135,5 +171,6 @@ export async function deployAgentIntoLxc(
     cfg, vmid,
     ['bash', '-c', 'systemctl daemon-reload && systemctl enable ninja-agent && systemctl start ninja-agent'],
     'enable and start agent service',
+    logger,
   )
 }

@@ -4,6 +4,7 @@ import { sql } from '../db/client.js'
 import { proxmoxService } from '../services/proxmox.js'
 import { nodeService } from '../services/node.js'
 import { deployAgentIntoLxc } from '../services/agent-deployer.js'
+import { JobLogger } from '../services/job-logger.js'
 import { sessionManager } from '../ws/session.js'
 import { AppError } from '../errors.js'
 import type { LxcCreateRequest, QemuCreateRequest, ProvisioningJob, ProvisioningState } from '@ninja/types'
@@ -145,7 +146,9 @@ async function runProvisioningJob(jobId: string): Promise<void> {
   // LXC + deployAgent → deploying → done
   if (row.guest_type === 'lxc' && row.deploy_agent) {
     await transition(jobId, 'deploying')
-    await deployAgentIntoLxc(cfg, row.vmid, row.node_id)
+    const logger = new JobLogger('provisioning', jobId)
+    await deployAgentIntoLxc(cfg, row.vmid, row.node_id, logger)
+    await logger.flush()
   }
 
   await transition(jobId, 'done')

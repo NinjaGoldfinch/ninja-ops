@@ -1,15 +1,13 @@
 import { createRoute } from '@tanstack/react-router'
 import { Link } from '@tanstack/react-router'
-import { Server, GitBranch, Bot, Activity } from 'lucide-react'
+import { Server, Bot, Activity } from 'lucide-react'
 import { layoutRoute } from '@/layout-route'
 import { useNodes } from '@/hooks/useNodes'
-import { useDeployJobs } from '@/hooks/useDeploy'
 import { useAgents } from '@/hooks/useAgents'
 import { NodeCard } from '@/components/nodes/NodeCard'
-import { JobStatusBadge } from '@/components/deploy/JobStatusBadge'
 import { MetricCard } from '@/components/metrics/MetricCard'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatRelative, truncate } from '@/lib/utils'
+import { formatRelative } from '@/lib/utils'
 
 export const indexRoute = createRoute({
   getParentRoute: () => layoutRoute,
@@ -19,14 +17,9 @@ export const indexRoute = createRoute({
 
 function OverviewPage() {
   const { data: nodes, isLoading: nodesLoading } = useNodes()
-  const { data: jobs, isLoading: jobsLoading } = useDeployJobs({ limit: 10 })
   const { data: agents, isLoading: agentsLoading } = useAgents()
 
   const onlineAgents = agents?.filter((a) => a.status !== 'offline').length ?? 0
-  const todayStart = new Date()
-  todayStart.setHours(0, 0, 0, 0)
-  const deploysToday =
-    jobs?.filter((j) => new Date(j.queuedAt) >= todayStart).length ?? 0
 
   return (
     <div className="space-y-8">
@@ -38,19 +31,14 @@ function OverviewPage() {
           icon={<Server size={18} />}
         />
         <MetricCard
-          label="Deploys Today"
-          value={deploysToday}
-          icon={<GitBranch size={18} />}
-        />
-        <MetricCard
           label="Agents Online"
           value={agents ? onlineAgents : null}
           sub={`of ${agents?.length ?? 0} total`}
           icon={<Bot size={18} />}
         />
         <MetricCard
-          label="Total Nodes"
-          value={nodes?.length ?? null}
+          label="Agents Total"
+          value={agents?.length ?? null}
           icon={<Activity size={18} />}
         />
       </div>
@@ -89,77 +77,6 @@ function OverviewPage() {
             </Link>
           </div>
         )}
-      </section>
-
-      {/* Recent deploys */}
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-            Recent Deploys
-          </h2>
-          <Link to="/deploy/jobs" className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
-            View all →
-          </Link>
-        </div>
-        <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-          <table className="w-full text-left">
-            <thead className="bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
-              <tr>
-                <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">Target</th>
-                <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">State</th>
-                <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">Triggered</th>
-                <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">When</th>
-              </tr>
-            </thead>
-            <tbody>
-              {jobsLoading
-                ? Array.from({ length: 5 }).map((_, i) => (
-                    <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800">
-                      {Array.from({ length: 4 }).map((_, j) => (
-                        <td key={j} className="px-4 py-3">
-                          <Skeleton className="h-4 w-full" />
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                : jobs?.map((job) => {
-                    const repoLabel = job.target
-                      ? `${job.target.repository}@${job.target.branch}`
-                      : job.trigger.source === 'github_webhook'
-                      ? `${job.trigger.repository}@${job.trigger.branch}`
-                      : job.targetId.slice(0, 8)
-                    return (
-                      <tr
-                        key={job.id}
-                        className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer"
-                      >
-                        <td className="px-4 py-2.5 font-mono text-xs text-zinc-700 dark:text-zinc-300">
-                          <Link to="/deploy/jobs/$jobId" params={{ jobId: job.id }}>
-                            {truncate(repoLabel, 40)}
-                          </Link>
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <JobStatusBadge state={job.state} />
-                        </td>
-                        <td className="px-4 py-2.5 text-xs text-zinc-500 dark:text-zinc-400 capitalize">
-                          {job.trigger.source}
-                        </td>
-                        <td className="px-4 py-2.5 text-xs text-zinc-500 dark:text-zinc-400">
-                          {formatRelative(job.queuedAt)}
-                        </td>
-                      </tr>
-                    )
-                  })}
-              {!jobsLoading && (!jobs || jobs.length === 0) && (
-                <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
-                    No deploys yet
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
       </section>
 
       {/* Active agents */}

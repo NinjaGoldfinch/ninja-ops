@@ -13,10 +13,17 @@ import {
   handleTerminalResize,
   handleTerminalClose,
 } from './handlers/terminal.js'
+import { handleDiagnosticExec } from './handlers/diagnostic.js'
+import { setLogBroadcaster, getLogBuffer } from '../lib/log-interceptor.js'
 
 const AUTH_TIMEOUT_MS = 10_000
 
 export const registerWebSocket = fp(async function wsPlugin(app: FastifyInstance) {
+  // Wire log interceptor → session broadcaster
+  setLogBroadcaster((entry) => {
+    sessionManager.broadcastControlLog(entry.stream, entry.data, entry.ts)
+  })
+
   await app.register(websocket)
 
   app.get('/ws', { websocket: true }, (socket, _req) => {
@@ -91,6 +98,23 @@ export const registerWebSocket = fp(async function wsPlugin(app: FastifyInstance
         case 'unsubscribe_logs':
           // Log subscriptions handled by log-service — not implemented yet
           socket.send(JSON.stringify({ type: 'error', code: 'NOT_IMPLEMENTED', message: 'Log subscriptions not yet implemented' }))
+          break
+        case 'subscribe_control_logs':
+          if (session.role === 'admin') {
+            sessionManager.subscribeControlLog(connectionId)
+            // Replay buffer so the panel isn't blank on open
+            for (const entry of getLogBuffer()) {
+              socket.send(JSON.stringify({ type: 'control_log', ...entry }))
+            }
+          } else {
+            socket.send(JSON.stringify({ type: 'error', code: 'FORBIDDEN', message: 'Admin role required' }))
+          }
+          break
+        case 'unsubscribe_control_logs':
+          sessionManager.unsubscribeControlLog(connectionId)
+          break
+        case 'diagnostic_exec':
+          void handleDiagnosticExec(connectionId, socket, msg)
           break
       }
     })

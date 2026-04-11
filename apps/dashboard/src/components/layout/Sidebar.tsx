@@ -2,7 +2,6 @@ import { Link } from '@tanstack/react-router'
 import {
   LayoutDashboard,
   Server,
-  GitBranch,
   Bot,
   ClipboardList,
   Settings,
@@ -10,6 +9,7 @@ import {
   ChevronRight,
   Zap,
   Layers,
+  Stethoscope,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUiStore } from '@/stores/ui'
@@ -18,9 +18,9 @@ const navItems = [
   { to: '/', label: 'Overview', icon: LayoutDashboard },
   { to: '/nodes', label: 'Nodes', icon: Server },
   { to: '/containers', label: 'Containers', icon: Layers },
-  { to: '/deploy', label: 'Deploy', icon: GitBranch },
   { to: '/agents', label: 'Agents', icon: Bot },
   { to: '/audit', label: 'Audit', icon: ClipboardList },
+  { to: '/diagnostics', label: 'Diagnostics', icon: Stethoscope },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 

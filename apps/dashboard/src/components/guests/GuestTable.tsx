@@ -11,9 +11,10 @@ interface GuestTableProps {
   nodeId: string
   isLoading: boolean
   canPower: boolean
+  isAdmin?: boolean
 }
 
-export function GuestTable({ guests, nodeId, isLoading, canPower }: GuestTableProps) {
+export function GuestTable({ guests, nodeId, isLoading, canPower, isAdmin }: GuestTableProps) {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
@@ -90,6 +91,7 @@ export function GuestTable({ guests, nodeId, isLoading, canPower }: GuestTablePr
                     guest={guest}
                     nodeId={nodeId}
                     canPower={canPower}
+                    isAdmin={isAdmin}
                   />
                 ))}
             {!isLoading && filtered.length === 0 && (

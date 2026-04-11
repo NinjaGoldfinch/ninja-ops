@@ -5,6 +5,7 @@ import { nodeService } from '../../services/node.js'
 import { proxmoxService } from '../../services/proxmox.js'
 import { auditService } from '../../services/audit.js'
 import { deployAgentIntoLxc } from '../../services/agent-deployer.js'
+import { JobLogger } from '../../services/job-logger.js'
 import { AppError } from '../../errors.js'
 import { requireRole } from '../../plugins/rbac.js'
 
@@ -165,6 +166,36 @@ export default async function guestRoutes(app: FastifyInstance) {
     },
   )
 
+  // DELETE /api/nodes/:nodeId/guests/:vmid
+  app.delete(
+    '/:nodeId/guests/:vmid',
+    { preHandler: [app.authenticate, requireRole('admin')] },
+    async (request, reply) => {
+      const { nodeId, vmid: vmidStr } = request.params as { nodeId: string; vmid: string }
+      const vmid = parseInt(vmidStr, 10)
+      const cfg = await getNodeConfig(nodeId)
+      const guest = await resolveGuest(cfg, nodeId, vmid)
+
+      if (guest.status !== 'stopped') {
+        throw AppError.validationError('Guest must be stopped before deleting', [])
+      }
+
+      await proxmoxService.destroyGuest(cfg, guest.type, vmid)
+
+      auditService.log({
+        userId: request.user.sub,
+        username: request.user.username,
+        action: 'guest_delete',
+        resourceType: 'guest',
+        resourceId: `${nodeId}/${vmid}`,
+        meta: { name: guest.name, type: guest.type },
+        ip: request.ip,
+      })
+
+      return reply.status(204).send()
+    },
+  )
+
   // POST /api/nodes/:nodeId/guests/:vmid/deploy-agent
   app.post(
     '/:nodeId/guests/:vmid/deploy-agent',
@@ -179,7 +210,9 @@ export default async function guestRoutes(app: FastifyInstance) {
         throw AppError.validationError('Agent deployment is only supported for LXC containers', [])
       }
 
-      await deployAgentIntoLxc(cfg, vmid, nodeId)
+      const logger = new JobLogger('agent_deploy', `${nodeId}/${vmid}`)
+      await deployAgentIntoLxc(cfg, vmid, nodeId, logger)
+      await logger.flush()
 
       auditService.log({
         userId: request.user.sub,
@@ -190,7 +223,7 @@ export default async function guestRoutes(app: FastifyInstance) {
         ip: request.ip,
       })
 
-      return reply.send({ ok: true, data: { deployed: true } })
+      return reply.send({ ok: true, data: { deployed: true, sessionId: logger.sessionId } })
     },
   )
 }

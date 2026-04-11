@@ -1,5 +1,5 @@
 import type { WebSocket } from '@fastify/websocket'
-import type { Role, GuestMetrics, NodeMetrics, DeployJob, DeployLogLine, ProvisioningJob } from '@ninja/types'
+import type { Role, GuestMetrics, NodeMetrics, DeployJob, DeployLogLine, ProvisioningJob, Agent } from '@ninja/types'
 
 interface WsSession {
   ws: WebSocket
@@ -8,6 +8,7 @@ interface WsSession {
   metricSubscriptions: Set<string>   // "nodeId:vmid"
   deploySubscriptions: Set<string>   // jobId
   terminalSessions: Set<string>      // sessionId
+  controlLogSubscribed: boolean
 }
 
 function send(ws: WebSocket, msg: object): void {
@@ -27,6 +28,7 @@ export class SessionManager {
       metricSubscriptions: new Set(),
       deploySubscriptions: new Set(),
       terminalSessions: new Set(),
+      controlLogSubscribed: false,
     })
   }
 
@@ -96,10 +98,36 @@ export class SessionManager {
     }
   }
 
+  subscribeControlLog(connectionId: string): void {
+    const s = this.sessions.get(connectionId)
+    if (s) s.controlLogSubscribed = true
+  }
+
+  unsubscribeControlLog(connectionId: string): void {
+    const s = this.sessions.get(connectionId)
+    if (s) s.controlLogSubscribed = false
+  }
+
+  broadcastControlLog(stream: 'stdout' | 'stderr', data: string, ts: number): void {
+    for (const session of this.sessions.values()) {
+      if (session.controlLogSubscribed) {
+        send(session.ws, { type: 'control_log', stream, data, ts })
+      }
+    }
+  }
+
   broadcastProvisioningUpdate(data: ProvisioningJob): void {
     for (const session of this.sessions.values()) {
       if (session.userId) {
         send(session.ws, { type: 'provisioning_update', data })
+      }
+    }
+  }
+
+  broadcastAgentStatus(data: Agent): void {
+    for (const session of this.sessions.values()) {
+      if (session.userId) {
+        send(session.ws, { type: 'agent_status', data })
       }
     }
   }

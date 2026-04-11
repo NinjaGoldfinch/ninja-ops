@@ -279,11 +279,30 @@ export class ProxmoxService {
   // ── Provisioning ─────────────────────────────────────────────────────────
 
   async nextVmid(cfg: ProxmoxConfig): Promise<number> {
-    const id = await proxmoxFetch<number>(
-      `${apiBase(cfg)}/cluster/nextid`,
-      cfg,
-    )
-    return id
+    // /cluster/nextid requires Corosync and fails on standalone nodes.
+    // Fall back to scanning the node's existing VMIDs and picking the next free one.
+    try {
+      const id = await proxmoxFetch<number>(
+        `${apiBase(cfg)}/cluster/nextid`,
+        cfg,
+      )
+      return id
+    } catch {
+      const [qemu, lxc] = await Promise.all([
+        proxmoxFetch<Array<{ vmid: number }>>(
+          `${apiBase(cfg)}/nodes/${cfg.nodeName}/qemu`,
+          cfg,
+        ).catch(() => [] as Array<{ vmid: number }>),
+        proxmoxFetch<Array<{ vmid: number }>>(
+          `${apiBase(cfg)}/nodes/${cfg.nodeName}/lxc`,
+          cfg,
+        ).catch(() => [] as Array<{ vmid: number }>),
+      ])
+      const used = new Set([...qemu, ...lxc].map(g => g.vmid))
+      let candidate = 100
+      while (used.has(candidate)) candidate++
+      return candidate
+    }
   }
 
   async createLxc(cfg: ProxmoxConfig, params: LxcCreateRequest, vmid: number): Promise<string> {
@@ -444,6 +463,14 @@ export class ProxmoxService {
     }))
   }
 
+  async destroyGuest(cfg: ProxmoxConfig, type: GuestType, vmid: number): Promise<string> {
+    return proxmoxFetch<string>(
+      `${guestPath(cfg, type, vmid)}`,
+      cfg,
+      { method: 'DELETE' },
+    )
+  }
+
   async getGuestStatus(cfg: ProxmoxConfig, type: GuestType, vmid: number): Promise<string> {
     interface GuestStatus { status: string }
     const status = await proxmoxFetch<GuestStatus>(
@@ -451,18 +478,6 @@ export class ProxmoxService {
       cfg,
     )
     return status.status
-  }
-
-  async execInLxc(
-    cfg: ProxmoxConfig,
-    vmid: number,
-    command: string[],
-  ): Promise<{ upid: string }> {
-    return proxmoxFetch<{ upid: string }>(
-      `${apiBase(cfg)}/nodes/${cfg.nodeName}/lxc/${vmid}/exec`,
-      cfg,
-      { method: 'POST', body: { command } },
-    )
   }
 
   /**
@@ -523,6 +538,68 @@ export class ProxmoxService {
         port: 22,
         username: cfg.sshUser ?? 'root',
         // Accept any host key — same philosophy as the HTTPS insecureAgent
+        hostVerifier: () => true,
+      }
+      if (cfg.sshPassword) connectCfg.password = cfg.sshPassword
+      conn.connect(connectCfg)
+    })
+  }
+
+  /**
+   * SSH into the Proxmox host and run `pct exec <vmid> -- <command>`, streaming
+   * stdout and stderr via callbacks. Returns the process exit code.
+   * Used by the diagnostics exec console for real-time output.
+   */
+  sshPctExecStreaming(
+    cfg: ProxmoxConfig,
+    vmid: number,
+    command: string[],
+    onStdout: (data: string) => void,
+    onStderr: (data: string) => void,
+    timeoutMs = 120_000,
+  ): Promise<number> {
+    if (!cfg.sshPassword) {
+      throw AppError.internal(
+        'SSH fallback requires sshPassword — configure it on the node to use pct exec on pre-8.1 Proxmox',
+      )
+    }
+
+    const shellQuote = (s: string) => `'${s.replace(/'/g, "'\\''")}'`
+    const cmdStr = `pct exec ${vmid} -- ${command.map(shellQuote).join(' ')}`
+
+    return new Promise((resolve, reject) => {
+      const conn = new SshClient()
+      const timer = setTimeout(() => {
+        conn.end()
+        reject(AppError.internal(`SSH pct exec timed out after ${timeoutMs}ms: ${cmdStr}`))
+      }, timeoutMs)
+
+      conn.on('ready', () => {
+        conn.exec(cmdStr, (err, stream) => {
+          if (err) {
+            clearTimeout(timer)
+            conn.end()
+            return reject(AppError.internal(`SSH exec failed: ${err.message}`))
+          }
+          stream.on('data', (d: Buffer) => { onStdout(d.toString()) })
+          stream.stderr.on('data', (d: Buffer) => { onStderr(d.toString()) })
+          stream.on('close', (code: number) => {
+            clearTimeout(timer)
+            conn.end()
+            resolve(code ?? 1)
+          })
+        })
+      })
+
+      conn.on('error', (err) => {
+        clearTimeout(timer)
+        reject(AppError.internal(`SSH connection failed: ${err.message}`))
+      })
+
+      const connectCfg: Parameters<SshClient['connect']>[0] = {
+        host: cfg.sshHost ?? cfg.host,
+        port: 22,
+        username: cfg.sshUser ?? 'root',
         hostVerifier: () => true,
       }
       if (cfg.sshPassword) connectCfg.password = cfg.sshPassword

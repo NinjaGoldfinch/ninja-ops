@@ -175,10 +175,11 @@ run_step() {
 }
 
 # ── Step wrappers (subshells so cd does not affect the script) ────────────────
-_step_docker()  { docker compose -f "$COMPOSE_FILE" up -d; }
-_step_install() { ( cd "$REPO_ROOT" && pnpm install ); }
-_step_migrate() { ( cd "$REPO_ROOT" && pnpm --filter @ninja/control-plane db:migrate ); }
-_step_seed()    { ( cd "$REPO_ROOT" && pnpm --filter @ninja/control-plane db:seed ); }
+_step_docker()        { docker compose -f "$COMPOSE_FILE" up -d; }
+_step_install()       { ( cd "$REPO_ROOT" && pnpm install ); }
+_step_package_agent() { ( cd "$REPO_ROOT" && pnpm package:agent ); }
+_step_migrate()       { ( cd "$REPO_ROOT" && pnpm --filter @ninja/control-plane db:migrate ); }
+_step_seed()          { ( cd "$REPO_ROOT" && pnpm --filter @ninja/control-plane db:seed ); }
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  1. PREREQUISITE CHECKS
@@ -360,6 +361,7 @@ mkdir -p "$(dirname "$ENV_FILE")"
   printf '# ── Agent ───────────────────────────────────────────────\n'
   printf 'AGENT_SECRET=%s\n' "$AGENT_SECRET"
   printf 'AGENT_JWT_EXPIRY=7d\n'
+  printf 'AGENT_BUNDLE_PATH=%s/apps/control-plane/agent-bundle.tar.gz\n' "$REPO_ROOT"
   printf '\n'
   printf '# ── GitHub Webhooks ─────────────────────────────────────\n'
   printf 'GITHUB_WEBHOOK_SECRET=%s\n' "$GITHUB_WEBHOOK_SECRET"
@@ -458,6 +460,9 @@ if [ "$OPT_SKIP_INSTALL" -eq 0 ]; then
 else
   log_info "Skipping pnpm install (--skip-install)"
 fi
+
+# Package deploy-agent bundle (requires install to have run first)
+run_step "Build agent bundle" _step_package_agent
 
 # Migrations and seed (run seed only if migrate succeeds)
 if [ "$OPT_SKIP_MIGRATE" -eq 0 ]; then

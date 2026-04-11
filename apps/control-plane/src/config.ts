@@ -1,4 +1,9 @@
 import { z } from 'zod'
+import { resolve, dirname } from 'path'
+import { fileURLToPath } from 'url'
+
+// Resolve paths relative to this package root, not the process CWD
+const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
 const ConfigSchema = z.object({
   PORT: z.coerce.number().default(3000),
@@ -25,7 +30,7 @@ const ConfigSchema = z.object({
   CONTROL_PLANE_URL: z.string().url().optional(),
 
   // Path to the compiled deploy-agent bundle served at GET /api/agents/download
-  AGENT_BUNDLE_PATH: z.string().default('./agent-bundle.tar.gz'),
+  AGENT_BUNDLE_PATH: z.string().default(resolve(packageRoot, 'agent-bundle.tar.gz')),
 
   RATE_LIMIT_MAX: z.coerce.number().default(100),
   RATE_LIMIT_WINDOW: z.coerce.number().default(60_000),

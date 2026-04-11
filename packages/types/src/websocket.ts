@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { GuestMetricsSchema, NodeMetricsSchema } from './proxmox.js'
 import { DeployJobSchema, DeployLogLineSchema } from './deploy.js'
 import { LogEntrySchema, LogSubscriptionSchema } from './logs.js'
-import { AgentCommandSchema, AgentHeartbeatSchema, AgentResultSchema } from './agent.js'
+import { AgentCommandSchema, AgentHeartbeatSchema, AgentResultSchema, AgentSchema } from './agent.js'
 import { ProvisioningJobSchema } from './provisioning.js'
 
 // ── Client → Server ───────────────────────────────────────────────────────
@@ -76,6 +76,19 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
     type: z.literal('terminal_close'),
     sessionId: z.string().uuid(),
   }),
+
+  // Subscribe to control-plane stdout/stderr (admin only)
+  z.object({ type: z.literal('subscribe_control_logs') }),
+  z.object({ type: z.literal('unsubscribe_control_logs') }),
+
+  // Run a command inside an LXC container and stream output (admin only)
+  z.object({
+    type: z.literal('diagnostic_exec'),
+    requestId: z.string().uuid(),
+    nodeId: z.string().uuid(),
+    vmid: z.number().int().positive(),
+    command: z.array(z.string().min(1)).min(1),
+  }),
 ])
 export type ClientMessage = z.infer<typeof ClientMessageSchema>
 
@@ -136,6 +149,34 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('provisioning_update'),
     data: ProvisioningJobSchema,
+  }),
+
+  // Control-plane log stream
+  z.object({
+    type: z.literal('control_log'),
+    stream: z.enum(['stdout', 'stderr']),
+    data: z.string(),
+    ts: z.number(),
+  }),
+
+  // Diagnostic exec streaming
+  z.object({
+    type: z.literal('diagnostic_output'),
+    requestId: z.string().uuid(),
+    stream: z.enum(['stdout', 'stderr']),
+    data: z.string(),
+  }),
+  z.object({
+    type: z.literal('diagnostic_done'),
+    requestId: z.string().uuid(),
+    exitCode: z.number().int().nullable(),
+    error: z.string().optional(),
+  }),
+
+  // Agent status updates
+  z.object({
+    type: z.literal('agent_status'),
+    data: AgentSchema,
   }),
 
   // Generic error

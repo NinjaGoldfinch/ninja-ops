@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch --env-file=../../env/deploy-agent.env src/index.ts",
     "build": "tsc",
-    "package": "tsc && node ../../scripts/package-agent.mjs",
+    "package": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=esm --external:node:* --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\" --outfile=dist-bundle/index.js && node ../../scripts/package-agent.mjs",
     "start": "node --env-file=../../env/deploy-agent.env dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -21,6 +21,7 @@
   "devDependencies": {
     "@types/node": "^22",
     "@types/ws": "^8",
+    "esbuild": "^0.25",
     "tsx": "^4",
     "typescript": "^5.5",
     "vitest": "^2"

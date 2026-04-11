@@ -2,8 +2,9 @@ import { createRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { ws } from '@/lib/ws'
 import { nodeIdRoute } from '../route'
-import { useGuest, useSnapshots, useCreateSnapshot, useDeleteSnapshot, useDeployAgent } from '@/hooks/useGuests'
+import { useGuest, useSnapshots, useCreateSnapshot, useDeleteSnapshot } from '@/hooks/useGuests'
 import { useGuestMetrics } from '@/hooks/useMetrics'
+import { useJobSessions, useJobSessionLogs } from '@/hooks/useDiagnostics'
 import { useAuthStore } from '@/stores/auth'
 import { useToast } from '@/components/ui/toast'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -17,7 +18,7 @@ import { CpuChart } from '@/components/metrics/CpuChart'
 import { MemoryChart } from '@/components/metrics/MemoryChart'
 import { NetworkChart } from '@/components/metrics/NetworkChart'
 import { Terminal } from '@/components/terminal/Terminal'
-import { Trash2, Plus, Lock, Bot } from 'lucide-react'
+import { Trash2, Plus, Lock } from 'lucide-react'
 import { formatRelative, formatUptime } from '@/lib/utils'
 
 export const guestDetailRoute = createRoute({
@@ -37,7 +38,7 @@ function GuestDetailPage() {
 
   const isAdmin = user?.role === 'admin'
   const canTerminal = user?.role === 'admin' || user?.role === 'operator'
-  const { mutate: deployAgent, isPending: deploying } = useDeployAgent()
+  const [lastDeploySessionId, setLastDeploySessionId] = useState<string | null>(null)
   const sessionId = `term-${nodeId}-${vmid}`
 
   if (error) return <QueryError error={error} onRetry={() => void refetch()} />
@@ -66,23 +67,6 @@ function GuestDetailPage() {
           </div>
         ) : null}
 
-        {isAdmin && guest?.type === 'lxc' && (
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={deploying}
-            onClick={() => deployAgent(
-              { nodeId, vmid },
-              {
-                onSuccess: () => toast({ title: 'Agent deployed', variant: 'success' }),
-                onError: (err) => toast({ title: 'Deploy failed', description: String(err), variant: 'error' }),
-              },
-            )}
-          >
-            <Bot size={14} />
-            {deploying ? 'Deploying…' : 'Deploy Agent'}
-          </Button>
-        )}
       </div>
 
       {/* Tabs */}
@@ -92,6 +76,9 @@ function GuestDetailPage() {
           <TabsTrigger value="snapshots">Snapshots</TabsTrigger>
           <TabsTrigger value="terminal">Terminal</TabsTrigger>
           <TabsTrigger value="commands">Commands</TabsTrigger>
+          {isAdmin && guest?.type === 'lxc' && (
+            <TabsTrigger value="deploy-logs">Deploy Logs</TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="metrics" className="mt-4">
@@ -119,6 +106,12 @@ function GuestDetailPage() {
         <TabsContent value="commands" className="mt-4">
           <CommandsTab nodeId={nodeId} vmid={vmid} sessionId={sessionId} canRun={canTerminal} toast={toast} />
         </TabsContent>
+
+        {isAdmin && guest?.type === 'lxc' && (
+          <TabsContent value="deploy-logs" className="mt-4">
+            <DeployLogsTab nodeId={nodeId} vmid={vmid} initialSessionId={lastDeploySessionId} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   )
@@ -268,6 +261,77 @@ function SnapshotsTab({ nodeId, vmid }: { nodeId: string; vmid: number }) {
           </tbody>
         </table>
       </div>
+    </div>
+  )
+}
+
+// ─── Deploy Logs Tab ─────────────────────────────────────────────────────────
+
+function DeployLogsTab({ nodeId, vmid, initialSessionId }: { nodeId: string; vmid: number; initialSessionId: string | null }) {
+  const jobId = `${nodeId}/${vmid}`
+  const { data: sessions, isLoading: sessionsLoading } = useJobSessions('agent_deploy', jobId)
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
+
+  // When a new deploy completes and passes a sessionId, select it
+  const [prevInitial, setPrevInitial] = useState(initialSessionId)
+  if (initialSessionId !== prevInitial) {
+    setPrevInitial(initialSessionId)
+    setSelectedSessionId(initialSessionId)
+  }
+
+  const effectiveSessionId = selectedSessionId ?? sessions?.[0]?.sessionId ?? null
+  const { data: logs, isLoading: logsLoading } = useJobSessionLogs(effectiveSessionId)
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Session:</span>
+        {sessionsLoading ? (
+          <Skeleton className="h-8 w-48" />
+        ) : sessions && sessions.length > 0 ? (
+          <select
+            className="text-xs font-mono bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1.5 text-zinc-900 dark:text-zinc-100"
+            value={effectiveSessionId ?? ''}
+            onChange={(e) => setSelectedSessionId(e.target.value)}
+          >
+            {sessions.map((s) => (
+              <option key={s.sessionId} value={s.sessionId}>
+                {new Date(s.createdAt).toLocaleString()} — {s.sessionId.slice(0, 8)}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">No deploy sessions yet</span>
+        )}
+      </div>
+
+      {effectiveSessionId && (
+        <div className="rounded-lg border border-zinc-800 bg-zinc-950 overflow-hidden">
+          <div className="px-3 py-2 border-b border-zinc-800 flex items-center justify-between">
+            <span className="text-xs font-mono text-zinc-400">Session {effectiveSessionId.slice(0, 8)}</span>
+            {logsLoading && <span className="text-xs text-zinc-500">Loading…</span>}
+          </div>
+          <div className="p-3 font-mono text-xs max-h-[500px] overflow-y-auto space-y-0.5">
+            {logsLoading ? (
+              <div className="text-zinc-500 py-4 text-center">Loading logs…</div>
+            ) : logs && logs.length > 0 ? (
+              logs.map((entry) => (
+                <div
+                  key={entry.id}
+                  className={entry.stream === 'stderr' ? 'text-red-400' : 'text-zinc-200'}
+                >
+                  <span className="text-zinc-600 select-none mr-2">
+                    {new Date(entry.ts).toLocaleTimeString()}
+                  </span>
+                  {entry.data.replace(/\n$/, '')}
+                </div>
+              ))
+            ) : (
+              <div className="text-zinc-500 py-4 text-center">No log entries for this session</div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

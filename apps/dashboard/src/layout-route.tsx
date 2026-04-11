@@ -6,12 +6,10 @@ import { useAuthStore } from '@/stores/auth'
 const PAGE_TITLES: Record<string, string> = {
   '/': 'Overview',
   '/nodes': 'Nodes',
-  '/deploy': 'Deploy',
-  '/deploy/targets/new': 'New Target',
-  '/deploy/jobs': 'Deploy Jobs',
   '/agents': 'Agents',
   '/audit': 'Audit Log',
   '/settings': 'Settings',
+  '/diagnostics': 'Diagnostics',
 }
 
 function getTitle(pathname: string): string {
@@ -20,7 +18,6 @@ function getTitle(pathname: string): string {
   // Pattern match for dynamic routes
   if (/^\/nodes\/[^/]+\/guests\/[^/]+/.test(pathname)) return 'Guest Detail'
   if (/^\/nodes\/[^/]+/.test(pathname)) return 'Node Detail'
-  if (/^\/deploy\/jobs\/[^/]+/.test(pathname)) return 'Job Detail'
   return 'ninja-ops'
 }
 

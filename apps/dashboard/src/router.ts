@@ -7,15 +7,12 @@ import { nodesRoute } from './pages/nodes/index'
 import { nodeIdRoute } from './pages/nodes/$nodeId/route'
 import { nodeDetailRoute } from './pages/nodes/$nodeId/index'
 import { guestDetailRoute } from './pages/nodes/$nodeId/guests/$vmid'
-import { deployRoute } from './pages/deploy/index'
-import { newTargetRoute } from './pages/deploy/targets/new'
-import { deployJobsRoute } from './pages/deploy/jobs/index'
-import { jobDetailRoute } from './pages/deploy/jobs/$jobId'
 import { agentsRoute } from './pages/agents/index'
 import { auditRoute } from './pages/audit/index'
 import { settingsRoute } from './pages/settings/index'
 import { provisionRoute } from './pages/provision/index'
 import { containersRoute } from './pages/containers/index'
+import { diagnosticsRoute } from './pages/diagnostics/index'
 
 const routeTree = rootRoute.addChildren([
   loginRoute,
@@ -24,14 +21,11 @@ const routeTree = rootRoute.addChildren([
     nodesRoute,
     nodeIdRoute.addChildren([nodeDetailRoute, guestDetailRoute]),
     containersRoute,
-    deployRoute,
-    newTargetRoute,
-    deployJobsRoute,
-    jobDetailRoute,
     agentsRoute,
     auditRoute,
     settingsRoute,
     provisionRoute,
+    diagnosticsRoute,
   ]),
 ])
 
