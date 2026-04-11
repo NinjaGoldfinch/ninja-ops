@@ -38,16 +38,6 @@ interface DbJob {
   updated_at: Date
 }
 
-interface DbNodeWithSsh {
-  name: string
-  host: string
-  port: number
-  token_id: string
-  token_secret: string
-  ssh_user: string
-  ssh_password: string | null
-}
-
 function toJob(row: DbJob): ProvisioningJob {
   return {
     id: row.id,

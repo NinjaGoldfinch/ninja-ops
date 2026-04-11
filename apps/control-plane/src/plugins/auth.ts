@@ -33,7 +33,7 @@ export default fp(async function authPlugin(app: FastifyInstance) {
 
   app.decorate(
     'authenticate',
-    async function authenticate(request: FastifyRequest, reply: FastifyReply) {
+    async function authenticate(request: FastifyRequest, _reply: FastifyReply) {
       const authHeader = request.headers.authorization
       if (!authHeader?.startsWith('Bearer ')) {
         throw AppError.unauthorized()

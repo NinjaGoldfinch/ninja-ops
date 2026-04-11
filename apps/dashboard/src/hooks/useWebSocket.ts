@@ -14,6 +14,5 @@ export function useWebSocket<T extends ServerMessage['type']>(
       }
     })
     return unsubscribe
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type, ...deps])
 }

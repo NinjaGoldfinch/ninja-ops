@@ -86,7 +86,7 @@ export async function deployAgentIntoLxc(
     logger,
   ).catch(() => {
     const warn = '[agent-deployer] locale setup skipped (non-fatal)\n'
-    logger ? logger.write('stderr', warn) : process.stderr.write(warn)
+    if (logger) { logger.write('stderr', warn) } else { process.stderr.write(warn) }
   })
 
   // Step 1 — detect Node.js; install if missing

@@ -1,5 +1,4 @@
 import fp from 'fastify-plugin'
-import websocket from '@fastify/websocket'
 import type { FastifyInstance } from 'fastify'
 import { AgentClientMessageSchema } from '@ninja/types'
 import { verifyToken } from '../plugins/auth.js'

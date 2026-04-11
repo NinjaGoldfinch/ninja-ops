@@ -13,7 +13,6 @@ export function setCurrentJobId(id: string | null): void {
 }
 
 let ws: WebSocket | null = null
-let authenticated = false
 let onCommandCallback: ((cmd: AgentCommand) => void) | null = null
 let agentIdRef = ''
 let tokenRef = ''
@@ -86,7 +85,6 @@ export function startConnection(agentId: string, token: string): void {
         clearTimeout(authTimeout)
         authTimeout = null
       }
-      authenticated = true
       log.info('Authenticated with control plane')
       startHeartbeat(agentId)
       return
@@ -107,7 +105,6 @@ export function startConnection(agentId: string, token: string): void {
   socket.on('close', () => {
     log.info('WebSocket closed, scheduling reconnect')
     stopHeartbeat()
-    authenticated = false
     ws = null
     scheduleReconnect()
   })
