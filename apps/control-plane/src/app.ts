@@ -18,8 +18,11 @@ import agentRoutes from './routes/agents/index.js'
 import auditRoutes from './routes/audit/index.js'
 import provisioningRoutes from './routes/provisioning/index.js'
 import diagnosticsRoutes from './routes/diagnostics/index.js'
+import logRoutes from './routes/logs/index.js'
+import logAgentRoutes from './routes/log-agents/index.js'
 import { registerWebSocket } from './ws/router.js'
 import { registerAgentWebSocket } from './ws/agent-router.js'
+import { registerLogAgentWebSocket } from './ws/log-agent-router.js'
 
 export async function buildApp() {
   const app = Fastify({
@@ -94,10 +97,13 @@ export async function buildApp() {
   await app.register(auditRoutes, { prefix: '/api/audit' })
   await app.register(provisioningRoutes, { prefix: '/api/provisioning' })
   await app.register(diagnosticsRoutes, { prefix: '/api/diagnostics' })
+  await app.register(logRoutes, { prefix: '/api/logs' })
+  await app.register(logAgentRoutes, { prefix: '/api/log-agents' })
 
   // WebSocket endpoints
   await app.register(registerWebSocket)
   await app.register(registerAgentWebSocket)
+  await app.register(registerLogAgentWebSocket)
 
   // Health check — no auth required
   app.get('/healthz', async () => ({ ok: true }))

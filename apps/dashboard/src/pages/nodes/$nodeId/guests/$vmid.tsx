@@ -1,8 +1,8 @@
 import { createRoute } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ws } from '@/lib/ws'
 import { nodeIdRoute } from '../route'
-import { useGuest, useSnapshots, useCreateSnapshot, useDeleteSnapshot } from '@/hooks/useGuests'
+import { useGuest, useSnapshots, useCreateSnapshot, useDeleteSnapshot, useDeployAgent, useDeployLogAgent } from '@/hooks/useGuests'
 import { useGuestMetrics } from '@/hooks/useMetrics'
 import { useJobSessions, useJobSessionLogs } from '@/hooks/useDiagnostics'
 import { useAuthStore } from '@/stores/auth'
@@ -18,7 +18,7 @@ import { CpuChart } from '@/components/metrics/CpuChart'
 import { MemoryChart } from '@/components/metrics/MemoryChart'
 import { NetworkChart } from '@/components/metrics/NetworkChart'
 import { Terminal } from '@/components/terminal/Terminal'
-import { Trash2, Plus, Lock } from 'lucide-react'
+import { Trash2, Plus, Lock, Bot, ScrollText } from 'lucide-react'
 import { formatRelative, formatUptime } from '@/lib/utils'
 
 export const guestDetailRoute = createRoute({
@@ -39,7 +39,11 @@ function GuestDetailPage() {
   const isAdmin = user?.role === 'admin'
   const canTerminal = user?.role === 'admin' || user?.role === 'operator'
   const [lastDeploySessionId, setLastDeploySessionId] = useState<string | null>(null)
+  const [lastLogAgentSessionId, setLastLogAgentSessionId] = useState<string | null>(null)
   const sessionId = `term-${nodeId}-${vmid}`
+
+  const { mutate: deployAgent, isPending: deploying } = useDeployAgent()
+  const { mutate: deployLogAgent, isPending: deployingLog } = useDeployLogAgent()
 
   if (error) return <QueryError error={error} onRetry={() => void refetch()} />
 
@@ -67,6 +71,49 @@ function GuestDetailPage() {
           </div>
         ) : null}
 
+        {isAdmin && guest?.type === 'lxc' && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={deploying}
+              onClick={() => deployAgent(
+                { nodeId, vmid },
+                {
+                  onSuccess: (data) => {
+                    toast({ title: 'Agent deploying…', variant: 'success' })
+                    setLastDeploySessionId(data.sessionId)
+                    setTab('deploy-logs')
+                  },
+                  onError: (err) => toast({ title: 'Deploy failed', description: String(err), variant: 'error' }),
+                },
+              )}
+            >
+              <Bot size={14} className={deploying ? 'animate-pulse' : ''} />
+              {deploying ? 'Starting…' : 'Deploy agent'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={deployingLog}
+              onClick={() => deployLogAgent(
+                { nodeId, vmid },
+                {
+                  onSuccess: (data) => {
+                    toast({ title: 'Log-agent deploying…', variant: 'success' })
+                    setLastLogAgentSessionId(data.sessionId)
+                    setTab('log-agent-logs')
+                  },
+                  onError: (err) => toast({ title: 'Deploy failed', description: String(err), variant: 'error' }),
+                },
+              )}
+            >
+              <ScrollText size={14} className={deployingLog ? 'animate-pulse' : ''} />
+              {deployingLog ? 'Starting…' : 'Deploy log-agent'}
+            </Button>
+          </div>
+        )}
+
       </div>
 
       {/* Tabs */}
@@ -78,6 +125,9 @@ function GuestDetailPage() {
           <TabsTrigger value="commands">Commands</TabsTrigger>
           {isAdmin && guest?.type === 'lxc' && (
             <TabsTrigger value="deploy-logs">Deploy Logs</TabsTrigger>
+          )}
+          {isAdmin && guest?.type === 'lxc' && (
+            <TabsTrigger value="log-agent-logs">Log Agent Logs</TabsTrigger>
           )}
         </TabsList>
 
@@ -110,6 +160,11 @@ function GuestDetailPage() {
         {isAdmin && guest?.type === 'lxc' && (
           <TabsContent value="deploy-logs" className="mt-4">
             <DeployLogsTab nodeId={nodeId} vmid={vmid} initialSessionId={lastDeploySessionId} />
+          </TabsContent>
+        )}
+        {isAdmin && guest?.type === 'lxc' && (
+          <TabsContent value="log-agent-logs" className="mt-4">
+            <DeployLogsTab nodeId={nodeId} vmid={vmid} initialSessionId={lastLogAgentSessionId} jobKind="log_agent_deploy" />
           </TabsContent>
         )}
       </Tabs>
@@ -267,32 +322,59 @@ function SnapshotsTab({ nodeId, vmid }: { nodeId: string; vmid: number }) {
 
 // ─── Deploy Logs Tab ─────────────────────────────────────────────────────────
 
-function DeployLogsTab({ nodeId, vmid, initialSessionId }: { nodeId: string; vmid: number; initialSessionId: string | null }) {
-  const jobId = `${nodeId}/${vmid}`
-  const { data: sessions, isLoading: sessionsLoading } = useJobSessions('agent_deploy', jobId)
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
+const DEPLOY_DONE_MARKERS = ['deployment complete', 'fatal:']
 
-  // When a new deploy completes and passes a sessionId, select it
+function DeployLogsTab({ nodeId, vmid, initialSessionId, jobKind = 'agent_deploy' }: { nodeId: string; vmid: number; initialSessionId: string | null; jobKind?: string }) {
+  const jobId = `${nodeId}/${vmid}`
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
+  const [isLive, setIsLive] = useState(true)
+  const logBottomRef = useRef<HTMLDivElement>(null)
+
+  // Sync selectedSessionId whenever a new deploy kick-off passes a fresh sessionId
+  // Also reset live state so the new session polls immediately
   const [prevInitial, setPrevInitial] = useState(initialSessionId)
   if (initialSessionId !== prevInitial) {
     setPrevInitial(initialSessionId)
     setSelectedSessionId(initialSessionId)
+    setIsLive(true)
   }
 
+  // Reset live state when the user manually picks a different session
+  const handleSessionChange = (id: string) => {
+    setSelectedSessionId(id)
+    setIsLive(true)
+  }
+
+  const { data: sessions, isLoading: sessionsLoading } = useJobSessions(jobKind, jobId, isLive)
   const effectiveSessionId = selectedSessionId ?? sessions?.[0]?.sessionId ?? null
-  const { data: logs, isLoading: logsLoading } = useJobSessionLogs(effectiveSessionId)
+  const { data: logs, isLoading: logsLoading } = useJobSessionLogs(effectiveSessionId, isLive)
+
+  // Scan all lines — a done marker anywhere means the job finished
+  const isDone = (logs ?? []).some(entry =>
+    DEPLOY_DONE_MARKERS.some(m => entry.data.includes(m)),
+  )
+
+  // Latch isLive → false once we see the terminal marker so polling stops
+  useEffect(() => {
+    if (isDone && isLive) setIsLive(false)
+  }, [isDone, isLive])
+
+  // Auto-scroll while running
+  useEffect(() => {
+    if (isLive) logBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [logs?.length, isLive])
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <span className="text-xs text-zinc-500 dark:text-zinc-400">Session:</span>
-        {sessionsLoading ? (
+        {sessionsLoading && !sessions ? (
           <Skeleton className="h-8 w-48" />
         ) : sessions && sessions.length > 0 ? (
           <select
             className="text-xs font-mono bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1.5 text-zinc-900 dark:text-zinc-100"
             value={effectiveSessionId ?? ''}
-            onChange={(e) => setSelectedSessionId(e.target.value)}
+            onChange={(e) => handleSessionChange(e.target.value)}
           >
             {sessions.map((s) => (
               <option key={s.sessionId} value={s.sessionId}>
@@ -301,7 +383,15 @@ function DeployLogsTab({ nodeId, vmid, initialSessionId }: { nodeId: string; vmi
             ))}
           </select>
         ) : (
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">No deploy sessions yet</span>
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">
+            {initialSessionId ? 'Waiting for first log…' : 'No deploy sessions yet'}
+          </span>
+        )}
+        {effectiveSessionId && isLive && (
+          <span className="flex items-center gap-1.5 text-xs text-amber-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+            Running
+          </span>
         )}
       </div>
 
@@ -309,25 +399,28 @@ function DeployLogsTab({ nodeId, vmid, initialSessionId }: { nodeId: string; vmi
         <div className="rounded-lg border border-zinc-800 bg-zinc-950 overflow-hidden">
           <div className="px-3 py-2 border-b border-zinc-800 flex items-center justify-between">
             <span className="text-xs font-mono text-zinc-400">Session {effectiveSessionId.slice(0, 8)}</span>
-            {logsLoading && <span className="text-xs text-zinc-500">Loading…</span>}
+            {logsLoading && !logs && <span className="text-xs text-zinc-500">Loading…</span>}
           </div>
           <div className="p-3 font-mono text-xs max-h-[500px] overflow-y-auto space-y-0.5">
-            {logsLoading ? (
+            {logsLoading && !logs ? (
               <div className="text-zinc-500 py-4 text-center">Loading logs…</div>
             ) : logs && logs.length > 0 ? (
-              logs.map((entry) => (
-                <div
-                  key={entry.id}
-                  className={entry.stream === 'stderr' ? 'text-red-400' : 'text-zinc-200'}
-                >
-                  <span className="text-zinc-600 select-none mr-2">
-                    {new Date(entry.ts).toLocaleTimeString()}
-                  </span>
-                  {entry.data.replace(/\n$/, '')}
-                </div>
-              ))
+              <>
+                {logs.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className={entry.stream === 'stderr' ? 'text-red-400' : 'text-zinc-200'}
+                  >
+                    <span className="text-zinc-600 select-none mr-2">
+                      {new Date(entry.ts).toLocaleTimeString()}
+                    </span>
+                    {entry.data.replace(/\n$/, '')}
+                  </div>
+                ))}
+                <div ref={logBottomRef} />
+              </>
             ) : (
-              <div className="text-zinc-500 py-4 text-center">No log entries for this session</div>
+              <div className="text-zinc-500 py-4 text-center">Waiting for log output…</div>
             )}
           </div>
         </div>
@@ -348,8 +441,8 @@ interface SavedCommand {
 // Implement GET/POST/DELETE /api/nodes/:nodeId/guests/:vmid/commands
 // backed by the saved_commands table once the control-plane routes exist.
 function CommandsTab({
-  nodeId,
-  vmid,
+  nodeId: _nodeId,
+  vmid: _vmid,
   sessionId,
   canRun,
   toast,

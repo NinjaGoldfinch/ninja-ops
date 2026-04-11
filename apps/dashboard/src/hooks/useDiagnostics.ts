@@ -19,19 +19,21 @@ export interface JobSession {
   createdAt: string
 }
 
-export function useJobSessionLogs(sessionId: string | null) {
+export function useJobSessionLogs(sessionId: string | null, live = false) {
   return useQuery({
     queryKey: ['job-logs', 'session', sessionId],
     queryFn: () => api.get<StoredLogEntry[]>(`/api/diagnostics/logs/${sessionId!}`),
     enabled: !!sessionId,
+    refetchInterval: live ? 1500 : false,
   })
 }
 
-export function useJobSessions(jobType: string, jobId: string | null) {
+export function useJobSessions(jobType: string, jobId: string | null, live = false) {
   return useQuery({
     queryKey: ['job-logs', 'job', jobType, jobId],
     queryFn: () => api.get<JobSession[]>(`/api/diagnostics/logs/job/${jobType}/${encodeURIComponent(jobId!)}`),
     enabled: !!jobId,
+    refetchInterval: live ? 3000 : false,
   })
 }
 

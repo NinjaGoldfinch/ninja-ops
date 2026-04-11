@@ -1,5 +1,5 @@
 import type { WebSocket } from '@fastify/websocket'
-import type { Role, GuestMetrics, NodeMetrics, DeployJob, DeployLogLine, ProvisioningJob, Agent } from '@ninja/types'
+import type { Role, GuestMetrics, NodeMetrics, DeployJob, DeployLogLine, ProvisioningJob, Agent, LogEntryRow } from '@ninja/types'
 
 interface WsSession {
   ws: WebSocket
@@ -9,6 +9,7 @@ interface WsSession {
   deploySubscriptions: Set<string>   // jobId
   terminalSessions: Set<string>      // sessionId
   controlLogSubscribed: boolean
+  logSubscriptions: Set<number>      // vmid
 }
 
 function send(ws: WebSocket, msg: object): void {
@@ -29,6 +30,7 @@ export class SessionManager {
       deploySubscriptions: new Set(),
       terminalSessions: new Set(),
       controlLogSubscribed: false,
+      logSubscriptions: new Set(),
     })
   }
 
@@ -112,6 +114,22 @@ export class SessionManager {
     for (const session of this.sessions.values()) {
       if (session.controlLogSubscribed) {
         send(session.ws, { type: 'control_log', stream, data, ts })
+      }
+    }
+  }
+
+  subscribeLog(connectionId: string, vmid: number): void {
+    this.sessions.get(connectionId)?.logSubscriptions.add(vmid)
+  }
+
+  unsubscribeLog(connectionId: string, vmid: number): void {
+    this.sessions.get(connectionId)?.logSubscriptions.delete(vmid)
+  }
+
+  broadcastLogLine(data: LogEntryRow): void {
+    for (const session of this.sessions.values()) {
+      if (session.logSubscriptions.has(data.vmid)) {
+        send(session.ws, { type: 'log_line', data })
       }
     }
   }

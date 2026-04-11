@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import type { ProxmoxNode } from '@ninja/types'
+import type { ProxmoxNode, SshAuthMethod } from '@ninja/types'
 
 export function useNodes() {
   return useQuery({
@@ -24,8 +24,11 @@ interface CreateNodeInput {
   tokenId: string
   tokenSecret: string
   sshUser?: string
-  sshPassword?: string
   sshHost?: string
+  sshAuthMethod?: SshAuthMethod
+  sshPassword?: string
+  sshPrivateKey?: string
+  sshKeyPassphrase?: string
 }
 
 export function useCreateNode() {
@@ -45,8 +48,11 @@ interface UpdateNodeInput {
   tokenId?: string
   tokenSecret?: string
   sshUser?: string
-  sshPassword?: string
   sshHost?: string
+  sshAuthMethod?: SshAuthMethod
+  sshPassword?: string
+  sshPrivateKey?: string
+  sshKeyPassphrase?: string
 }
 
 export function useUpdateNode() {

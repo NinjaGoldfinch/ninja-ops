@@ -13,8 +13,13 @@ const CreateNodeSchema = z.object({
   tokenId: z.string().min(1),
   tokenSecret: z.string().min(1),
   sshUser: z.string().min(1).default('root'),
+  sshHost: z.string().optional(),
+  sshAuthMethod: z.enum(['password', 'key']).default('password'),
+  // password auth
   sshPassword: z.string().min(1).optional(),
-  sshHost: z.string().min(1).optional(),
+  // key auth — PEM string or op:// 1Password reference
+  sshPrivateKey: z.string().min(1).optional(),
+  sshKeyPassphrase: z.string().min(1).optional(),
 })
 
 const UpdateNodeSchema = z.object({
@@ -24,8 +29,13 @@ const UpdateNodeSchema = z.object({
   tokenId: z.string().min(1).optional(),
   tokenSecret: z.string().min(1).optional(),
   sshUser: z.string().min(1).optional(),
-  sshPassword: z.string().min(1).optional(),
   sshHost: z.string().optional(),   // empty string clears the override
+  sshAuthMethod: z.enum(['password', 'key']).optional(),
+  // password auth
+  sshPassword: z.string().min(1).optional(),
+  // key auth
+  sshPrivateKey: z.string().min(1).optional(),
+  sshKeyPassphrase: z.string().min(1).optional(),
 })
 
 const TestConnectionSchema = z.object({
@@ -66,15 +76,19 @@ export default async function nodeRoutes(app: FastifyInstance) {
       const body = CreateNodeSchema.safeParse(request.body)
       if (!body.success) throw validationError(body.error)
 
+      const d = body.data
       const node = await nodeService.create({
-        name: body.data.name,
-        host: body.data.host,
-        port: body.data.port,
-        tokenId: body.data.tokenId,
-        tokenSecret: body.data.tokenSecret,
-        sshUser: body.data.sshUser,
-        ...(body.data.sshPassword !== undefined ? { sshPassword: body.data.sshPassword } : {}),
-        ...(body.data.sshHost !== undefined ? { sshHost: body.data.sshHost } : {}),
+        name: d.name,
+        host: d.host,
+        port: d.port,
+        tokenId: d.tokenId,
+        tokenSecret: d.tokenSecret,
+        sshUser: d.sshUser,
+        sshAuthMethod: d.sshAuthMethod,
+        ...(d.sshHost !== undefined ? { sshHost: d.sshHost } : {}),
+        ...(d.sshPassword !== undefined ? { sshPassword: d.sshPassword } : {}),
+        ...(d.sshPrivateKey !== undefined ? { sshPrivateKey: d.sshPrivateKey } : {}),
+        ...(d.sshKeyPassphrase !== undefined ? { sshKeyPassphrase: d.sshKeyPassphrase } : {}),
       })
       auditService.log({
         userId: request.user.sub,

@@ -48,6 +48,7 @@ const mockNode = {
   port: 8006,
   tokenId: 'root@pam!mytoken',
   sshUser: 'root',
+  sshAuthMethod: 'password' as const,
   status: 'online' as const,
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z',

@@ -14,7 +14,7 @@ import { QueryError } from '@/components/ui/query-error'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Plus, RefreshCw, Trash2, Pencil, CheckCircle, XCircle } from 'lucide-react'
 import { formatRelative } from '@/lib/utils'
-import type { ProxmoxNode } from '@ninja/types'
+import type { ProxmoxNode, SshAuthMethod } from '@ninja/types'
 
 export const nodesRoute = createRoute({
   getParentRoute: () => layoutRoute,
@@ -29,12 +29,22 @@ interface NodeFormData {
   tokenId: string
   tokenSecret: string
   sshUser: string
-  sshPassword: string
   sshHost: string
+  sshAuthMethod: SshAuthMethod
+  // password auth
+  sshPassword: string
+  // key auth
+  sshPrivateKey: string
+  sshKeyPassphrase: string
 }
 
 function initialForm(): NodeFormData {
-  return { name: '', host: '', port: '8006', tokenId: '', tokenSecret: '', sshUser: 'root', sshPassword: '', sshHost: '' }
+  return {
+    name: '', host: '', port: '8006', tokenId: '', tokenSecret: '',
+    sshUser: 'root', sshHost: '',
+    sshAuthMethod: 'password',
+    sshPassword: '', sshPrivateKey: '', sshKeyPassphrase: '',
+  }
 }
 
 function NodesPage() {
@@ -78,7 +88,13 @@ function NodesPage() {
 
   function openEdit(node: ProxmoxNode) {
     setEditingNode(node)
-    setForm({ name: node.name, host: node.host, port: String(node.port), tokenId: node.tokenId, tokenSecret: '', sshUser: node.sshUser ?? 'root', sshPassword: '', sshHost: node.sshHost ?? '' })
+    setForm({
+      name: node.name, host: node.host, port: String(node.port),
+      tokenId: node.tokenId, tokenSecret: '',
+      sshUser: node.sshUser ?? 'root', sshHost: node.sshHost ?? '',
+      sshAuthMethod: node.sshAuthMethod ?? 'password',
+      sshPassword: '', sshPrivateKey: '', sshKeyPassphrase: '',
+    })
     setTestResult(null)
     setSheetOpen(true)
   }
@@ -100,8 +116,11 @@ function NodesPage() {
         tokenId: form.tokenId,
         tokenSecret: form.tokenSecret,
         sshUser: form.sshUser || 'root',
-        ...(form.sshPassword ? { sshPassword: form.sshPassword } : {}),
+        sshAuthMethod: form.sshAuthMethod,
         ...(form.sshHost ? { sshHost: form.sshHost } : {}),
+        ...(form.sshAuthMethod === 'password' && form.sshPassword ? { sshPassword: form.sshPassword } : {}),
+        ...(form.sshAuthMethod === 'key' && form.sshPrivateKey ? { sshPrivateKey: form.sshPrivateKey } : {}),
+        ...(form.sshAuthMethod === 'key' && form.sshKeyPassphrase ? { sshKeyPassphrase: form.sshKeyPassphrase } : {}),
       },
       {
         onSuccess: () => {
@@ -117,15 +136,18 @@ function NodesPage() {
   function handleUpdate(e: React.FormEvent) {
     e.preventDefault()
     if (!editingNode) return
-    const input: Record<string, string | number> = {}
+    const input: Record<string, string | number | undefined> = {}
     if (form.name !== editingNode.name) input.name = form.name
     if (form.host !== editingNode.host) input.host = form.host
     if (Number(form.port) !== editingNode.port) input.port = Number(form.port) || 8006
     if (form.tokenId !== editingNode.tokenId) input.tokenId = form.tokenId
     if (form.tokenSecret) input.tokenSecret = form.tokenSecret
     if (form.sshUser !== (editingNode.sshUser ?? 'root')) input.sshUser = form.sshUser
-    if (form.sshPassword) input.sshPassword = form.sshPassword
     if (form.sshHost !== (editingNode.sshHost ?? '')) input.sshHost = form.sshHost
+    if (form.sshAuthMethod !== (editingNode.sshAuthMethod ?? 'password')) input.sshAuthMethod = form.sshAuthMethod
+    if (form.sshAuthMethod === 'password' && form.sshPassword) input.sshPassword = form.sshPassword
+    if (form.sshAuthMethod === 'key' && form.sshPrivateKey) input.sshPrivateKey = form.sshPrivateKey
+    if (form.sshAuthMethod === 'key' && form.sshKeyPassphrase) input.sshKeyPassphrase = form.sshKeyPassphrase
     updateNode(
       { nodeId: editingNode.id, input },
       {
@@ -264,27 +286,88 @@ function NodesPage() {
           </div>
 
           <div className="rounded-md border border-zinc-200 dark:border-zinc-700 p-3 space-y-3">
-            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-              SSH — required for agent deployment on Proxmox &lt; 8.1
-            </p>
+            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">SSH</p>
             <div className="space-y-1.5">
               <Label htmlFor="sshHost">
                 SSH Host <span className="text-zinc-400 font-normal">(leave blank to use API host)</span>
               </Label>
               <Input id="sshHost" value={form.sshHost} onChange={set('sshHost')} placeholder="192.168.1.x" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="sshUser">SSH User</Label>
-                <Input id="sshUser" value={form.sshUser} onChange={set('sshUser')} placeholder="root" />
+            <div className="space-y-1.5">
+              <Label htmlFor="sshUser">SSH User</Label>
+              <Input id="sshUser" value={form.sshUser} onChange={set('sshUser')} placeholder="root" />
+            </div>
+
+            {/* Auth method toggle */}
+            <div className="space-y-1.5">
+              <Label>Authentication</Label>
+              <div className="flex gap-1 rounded-md border border-zinc-200 dark:border-zinc-700 p-0.5 w-fit">
+                {(['password', 'key'] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, sshAuthMethod: m }))}
+                    className={`px-3 py-1 text-xs rounded transition-colors ${
+                      form.sshAuthMethod === m
+                        ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-medium'
+                        : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+                    }`}
+                  >
+                    {m === 'password' ? 'Password' : 'SSH Key'}
+                  </button>
+                ))}
               </div>
+            </div>
+
+            {form.sshAuthMethod === 'password' ? (
               <div className="space-y-1.5">
                 <Label htmlFor="sshPassword">
-                  SSH Password{editingNode && <span className="ml-1 text-zinc-400 font-normal">(leave blank to keep)</span>}
+                  Password{editingNode && <span className="ml-1 text-zinc-400 font-normal">(leave blank to keep)</span>}
                 </Label>
                 <Input id="sshPassword" type="password" value={form.sshPassword} onChange={set('sshPassword')} placeholder="••••••••" />
               </div>
-            </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="sshPrivateKey">
+                    Private Key{editingNode && <span className="ml-1 text-zinc-400 font-normal">(leave blank to keep)</span>}
+                  </Label>
+                  <textarea
+                    id="sshPrivateKey"
+                    value={form.sshPrivateKey}
+                    onChange={(e) => setForm((f) => ({ ...f, sshPrivateKey: e.target.value }))}
+                    rows={5}
+                    placeholder={"-----BEGIN OPENSSH PRIVATE KEY-----\n...\nor: op://vault/item/field"}
+                    className="w-full rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-xs font-mono resize-y focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    spellCheck={false}
+                  />
+                  <p className="text-xs text-zinc-400">
+                    Paste a PEM private key, or use a{' '}
+                    <a
+                      href="https://developer.1password.com/docs/cli/secrets-reference-syntax/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-zinc-600 dark:hover:text-zinc-300"
+                    >
+                      1Password secret reference
+                    </a>
+                    {' '}(<code className="text-xs">op://vault/item/field</code>).
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="sshKeyPassphrase">
+                    Passphrase <span className="text-zinc-400 font-normal">(if key is encrypted)</span>
+                  </Label>
+                  <Input
+                    id="sshKeyPassphrase"
+                    type="password"
+                    value={form.sshKeyPassphrase}
+                    onChange={set('sshKeyPassphrase')}
+                    placeholder="optional"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2">

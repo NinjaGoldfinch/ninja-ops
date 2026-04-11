@@ -4,7 +4,7 @@ import { PowerActionRequestSchema, CreateSnapshotRequestSchema } from '@ninja/ty
 import { nodeService } from '../../services/node.js'
 import { proxmoxService } from '../../services/proxmox.js'
 import { auditService } from '../../services/audit.js'
-import { deployAgentIntoLxc } from '../../services/agent-deployer.js'
+import { deployAgentIntoLxc, deployLogAgentIntoLxc } from '../../services/agent-deployer.js'
 import { JobLogger } from '../../services/job-logger.js'
 import { AppError } from '../../errors.js'
 import { requireRole } from '../../plugins/rbac.js'
@@ -17,7 +17,7 @@ function validationError(error: z.ZodError) {
 }
 
 async function getNodeConfig(nodeId: string) {
-  const { node, tokenSecret, sshPassword, sshHost } = await nodeService.getWithSecret(nodeId)
+  const { node, tokenSecret, sshPassword, sshHost, sshAuthMethod, sshPrivateKey, sshKeyPassphrase } = await nodeService.getWithSecret(nodeId)
   return {
     host: node.host,
     port: node.port,
@@ -25,8 +25,11 @@ async function getNodeConfig(nodeId: string) {
     tokenSecret,
     nodeName: node.name,
     sshUser: node.sshUser,
-    sshPassword,
     sshHost,
+    sshAuthMethod,
+    sshPassword,
+    sshPrivateKey,
+    sshKeyPassphrase,
   }
 }
 
@@ -211,13 +214,58 @@ export default async function guestRoutes(app: FastifyInstance) {
       }
 
       const logger = new JobLogger('agent_deploy', `${nodeId}/${vmid}`)
-      await deployAgentIntoLxc(cfg, vmid, nodeId, logger)
-      await logger.flush()
+
+      // Fire-and-forget so the client gets the sessionId immediately and can
+      // poll for live log updates while the deployment runs in the background.
+      void deployAgentIntoLxc(cfg, vmid, nodeId, logger)
+        .then(() => logger.info('[agent-deployer] deployment complete\n'))
+        .catch((err: unknown) => {
+          logger.error(`[agent-deployer] fatal: ${err instanceof Error ? err.message : String(err)}\n`)
+        })
+        .finally(() => void logger.flush())
 
       auditService.log({
         userId: request.user.sub,
         username: request.user.username,
         action: 'agent_deploy',
+        resourceType: 'guest',
+        resourceId: `${nodeId}/${vmid}`,
+        ip: request.ip,
+      })
+
+      return reply.send({ ok: true, data: { deployed: true, sessionId: logger.sessionId } })
+    },
+  )
+
+  // POST /api/nodes/:nodeId/guests/:vmid/deploy-log-agent
+  app.post(
+    '/:nodeId/guests/:vmid/deploy-log-agent',
+    { preHandler: [app.authenticate, requireRole('admin')] },
+    async (request, reply) => {
+      const { nodeId, vmid: vmidStr } = request.params as { nodeId: string; vmid: string }
+      const vmid = parseInt(vmidStr, 10)
+      const body = (request.body ?? {}) as { logUnits?: string }
+      const logUnits = typeof body.logUnits === 'string' ? body.logUnits : ''
+
+      const cfg = await getNodeConfig(nodeId)
+      const guest = await resolveGuest(cfg, nodeId, vmid)
+
+      if (guest.type !== 'lxc') {
+        throw AppError.validationError('Log-agent deployment is only supported for LXC containers', [])
+      }
+
+      const logger = new JobLogger('log_agent_deploy', `${nodeId}/${vmid}`)
+      void deployLogAgentIntoLxc(cfg, vmid, nodeId, logUnits, logger)
+        .then(() => logger.info('[log-agent-deployer] deployment complete\n'))
+        .catch((err: unknown) => {
+          logger.error(`[log-agent-deployer] fatal: ${err instanceof Error ? err.message : String(err)}\n`)
+        })
+        .finally(() => void logger.flush())
+
+      auditService.log({
+        userId: request.user.sub,
+        username: request.user.username,
+        action: 'log_agent_deploy',
         resourceType: 'guest',
         resourceId: `${nodeId}/${vmid}`,
         ip: request.ip,

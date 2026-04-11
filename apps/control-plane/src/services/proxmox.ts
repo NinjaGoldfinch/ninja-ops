@@ -1,5 +1,6 @@
 import { Client as SshClient } from 'ssh2'
 import { Agent, fetch as undiciFetch } from 'undici'
+import { resolveSecret } from '../lib/onepassword.js'
 import type {
   Guest,
   GuestType,
@@ -26,8 +27,13 @@ interface ProxmoxConfig {
   tokenSecret: string
   nodeName: string
   sshUser?: string
+  sshHost?: string | null      // overrides host for SSH connections
+  // password auth
   sshPassword?: string | null
-  sshHost?: string | null   // overrides host for SSH connections
+  // key auth
+  sshAuthMethod?: 'password' | 'key'
+  sshPrivateKey?: string | null   // decrypted PEM or op:// reference (resolved before SSH)
+  sshKeyPassphrase?: string | null
 }
 
 interface ProxmoxGuestRow {
@@ -484,17 +490,52 @@ export class ProxmoxService {
    * SSH into the Proxmox host and run `pct exec <vmid> -- <command>`.
    * Used as a fallback when the /exec REST API is unavailable (pre-PVE 8.1).
    */
-  sshPctExec(
+  /** Build the ssh2 connect config, resolving op:// references if needed. */
+  private async buildSshConnectCfg(
+    cfg: ProxmoxConfig,
+  ): Promise<Parameters<SshClient['connect']>[0]> {
+    const base: Parameters<SshClient['connect']>[0] = {
+      host: cfg.sshHost ?? cfg.host,
+      port: 22,
+      username: cfg.sshUser ?? 'root',
+      // Accept any host key — same philosophy as the HTTPS insecureAgent
+      hostVerifier: () => true,
+    }
+
+    const authMethod = cfg.sshAuthMethod ?? (cfg.sshPrivateKey ? 'key' : 'password')
+
+    if (authMethod === 'key') {
+      if (!cfg.sshPrivateKey) {
+        throw AppError.internal(
+          'SSH auth method is "key" but no private key is configured on this node.',
+        )
+      }
+      // Resolve op:// references at connection time — actual key never stored in DB
+      const privateKey = await resolveSecret(cfg.sshPrivateKey)
+      base.privateKey = privateKey
+      if (cfg.sshKeyPassphrase) {
+        const passphrase = await resolveSecret(cfg.sshKeyPassphrase)
+        base.passphrase = passphrase
+      }
+    } else {
+      if (!cfg.sshPassword) {
+        throw AppError.internal(
+          'SSH auth method is "password" but no password is configured on this node.',
+        )
+      }
+      base.password = cfg.sshPassword
+    }
+
+    return base
+  }
+
+  async sshPctExec(
     cfg: ProxmoxConfig,
     vmid: number,
     command: string[],
     timeoutMs = 120_000,
   ): Promise<void> {
-    if (!cfg.sshPassword) {
-      throw AppError.internal(
-        'SSH fallback requires sshPassword — configure it on the node to use pct exec on pre-8.1 Proxmox',
-      )
-    }
+    const connectCfg = await this.buildSshConnectCfg(cfg)
 
     // Shell-quote each argument (wrap in single quotes, escape internal single quotes)
     const shellQuote = (s: string) => `'${s.replace(/'/g, "'\\''")}'`
@@ -533,14 +574,6 @@ export class ProxmoxService {
         reject(AppError.internal(`SSH connection failed: ${err.message}`))
       })
 
-      const connectCfg: Parameters<SshClient['connect']>[0] = {
-        host: cfg.sshHost ?? cfg.host,
-        port: 22,
-        username: cfg.sshUser ?? 'root',
-        // Accept any host key — same philosophy as the HTTPS insecureAgent
-        hostVerifier: () => true,
-      }
-      if (cfg.sshPassword) connectCfg.password = cfg.sshPassword
       conn.connect(connectCfg)
     })
   }
@@ -550,7 +583,7 @@ export class ProxmoxService {
    * stdout and stderr via callbacks. Returns the process exit code.
    * Used by the diagnostics exec console for real-time output.
    */
-  sshPctExecStreaming(
+  async sshPctExecStreaming(
     cfg: ProxmoxConfig,
     vmid: number,
     command: string[],
@@ -558,11 +591,7 @@ export class ProxmoxService {
     onStderr: (data: string) => void,
     timeoutMs = 120_000,
   ): Promise<number> {
-    if (!cfg.sshPassword) {
-      throw AppError.internal(
-        'SSH fallback requires sshPassword — configure it on the node to use pct exec on pre-8.1 Proxmox',
-      )
-    }
+    const connectCfg = await this.buildSshConnectCfg(cfg)
 
     const shellQuote = (s: string) => `'${s.replace(/'/g, "'\\''")}'`
     const cmdStr = `pct exec ${vmid} -- ${command.map(shellQuote).join(' ')}`
@@ -596,13 +625,6 @@ export class ProxmoxService {
         reject(AppError.internal(`SSH connection failed: ${err.message}`))
       })
 
-      const connectCfg: Parameters<SshClient['connect']>[0] = {
-        host: cfg.sshHost ?? cfg.host,
-        port: 22,
-        username: cfg.sshUser ?? 'root',
-        hostVerifier: () => true,
-      }
-      if (cfg.sshPassword) connectCfg.password = cfg.sshPassword
       conn.connect(connectCfg)
     })
   }

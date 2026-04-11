@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { GuestMetricsSchema, NodeMetricsSchema } from './proxmox.js'
 import { DeployJobSchema, DeployLogLineSchema } from './deploy.js'
-import { LogEntrySchema, LogSubscriptionSchema } from './logs.js'
+import { LogEntryRowSchema } from './logs.js'
 import { AgentCommandSchema, AgentHeartbeatSchema, AgentResultSchema, AgentSchema } from './agent.js'
 import { ProvisioningJobSchema } from './provisioning.js'
 
@@ -27,15 +27,15 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
     vmid: z.number().int().positive(),
   }),
 
-  // Subscribe to log stream
+  // Subscribe to live log stream for a container
   z.object({
     type: z.literal('subscribe_logs'),
-    subscription: LogSubscriptionSchema,
+    vmid: z.number().int().positive(),
   }),
 
   z.object({
     type: z.literal('unsubscribe_logs'),
-    subscriptionId: z.string().uuid(),
+    vmid: z.number().int().positive(),
   }),
 
   // Subscribe to deploy job output
@@ -116,11 +116,10 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
     data: NodeMetricsSchema,
   }),
 
-  // Log stream
+  // Live log line from a container
   z.object({
-    type: z.literal('log_entry'),
-    subscriptionId: z.string().uuid(),
-    data: LogEntrySchema,
+    type: z.literal('log_line'),
+    data: LogEntryRowSchema,
   }),
 
   // Deploy updates

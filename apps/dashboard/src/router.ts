@@ -13,6 +13,7 @@ import { settingsRoute } from './pages/settings/index'
 import { provisionRoute } from './pages/provision/index'
 import { containersRoute } from './pages/containers/index'
 import { diagnosticsRoute } from './pages/diagnostics/index'
+import { logsRoute } from './pages/logs/index'
 
 const routeTree = rootRoute.addChildren([
   loginRoute,
@@ -26,6 +27,7 @@ const routeTree = rootRoute.addChildren([
     settingsRoute,
     provisionRoute,
     diagnosticsRoute,
+    logsRoute,
   ]),
 ])
 

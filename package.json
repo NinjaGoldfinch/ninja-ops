@@ -8,7 +8,8 @@
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint:fix",
-    "package:agent": "pnpm --filter @ninja/deploy-agent package"
+    "package:agent": "pnpm --filter @ninja/deploy-agent package",
+    "package:log-agent": "pnpm --filter @ninja/log-agent package"
   },
   "devDependencies": {
     "turbo": "^2",

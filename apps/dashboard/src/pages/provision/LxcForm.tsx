@@ -33,6 +33,7 @@ interface FormState {
   startOnBoot: boolean
   startAfterCreate: boolean
   deployAgent: boolean
+  deployLogAgent: boolean
 }
 
 type FieldErrors = Partial<Record<keyof FormState | 'form', string>>
@@ -54,7 +55,7 @@ export function LxcForm({ defaultNodeId, onSuccess }: LxcFormProps) {
     cores: '1', memory: '512', swap: '512', diskSize: '8', storage: '',
     bridge: 'vmbr0', ipType: 'dhcp', address: '', prefix: '24', gateway: '',
     dns: '', password: '', confirmPassword: '', sshPublicKey: '',
-    unprivileged: true, startOnBoot: true, startAfterCreate: true, deployAgent: false,
+    unprivileged: true, startOnBoot: true, startAfterCreate: true, deployAgent: false, deployLogAgent: false,
   })
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
 
@@ -101,6 +102,9 @@ export function LxcForm({ defaultNodeId, onSuccess }: LxcFormProps) {
     if (form.deployAgent && !form.startAfterCreate) {
       errors.deployAgent = "Auto-deploy requires 'Start after create' to be enabled"
     }
+    if (form.deployLogAgent && !form.startAfterCreate) {
+      errors.deployLogAgent = "Auto-deploy requires 'Start after create' to be enabled"
+    }
     return errors
   }
 
@@ -136,6 +140,7 @@ export function LxcForm({ defaultNodeId, onSuccess }: LxcFormProps) {
       startAfterCreate: form.startAfterCreate,
       tags: form.tags.split(',').map(t => t.trim()).filter(Boolean),
       deployAgent: form.deployAgent,
+      deployLogAgent: form.deployLogAgent,
     }
 
     create(payload, {
@@ -354,6 +359,23 @@ export function LxcForm({ defaultNodeId, onSuccess }: LxcFormProps) {
         )}
         {fieldErrors.deployAgent && (
           <p className="text-xs text-red-500">{fieldErrors.deployAgent}</p>
+        )}
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="lxc-deployLogAgent"
+            checked={form.deployLogAgent}
+            onChange={e => set('deployLogAgent', e.target.checked)}
+          />
+          <Label htmlFor="lxc-deployLogAgent">Auto-deploy log-agent after provisioning</Label>
+        </div>
+        {form.deployLogAgent && form.startAfterCreate && (
+          <div className="rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-4 py-3 text-sm text-blue-700 dark:text-blue-300">
+            The log-agent will be installed and will begin forwarding journald logs to the control plane automatically after the container starts.
+          </div>
+        )}
+        {fieldErrors.deployLogAgent && (
+          <p className="text-xs text-red-500">{fieldErrors.deployLogAgent}</p>
         )}
       </section>
 

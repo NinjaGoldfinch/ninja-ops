@@ -174,3 +174,113 @@ export async function deployAgentIntoLxc(
     logger,
   )
 }
+
+export async function deployLogAgentIntoLxc(
+  cfg: ProxmoxCfg,
+  vmid: number,
+  nodeId: string,
+  logUnits: string,
+  logger?: JobLogger,
+): Promise<void> {
+  const controlPlaneUrl = resolveControlPlaneUrl()
+
+  // Step 0 — locale (non-fatal, same as deploy-agent)
+  await exec(
+    cfg, vmid,
+    ['bash', '-c',
+      'apt-get install -y -qq locales 2>/dev/null && ' +
+      'locale-gen en_US.UTF-8 2>/dev/null && ' +
+      'update-locale LANG=en_US.UTF-8 2>/dev/null || true',
+    ],
+    'configure locale',
+    logger,
+  ).catch(() => {
+    const warn = '[log-agent-deployer] locale setup skipped (non-fatal)\n'
+    if (logger) { logger.write('stderr', warn) } else { process.stderr.write(warn) }
+  })
+
+  // Step 1 — detect Node.js; install if missing
+  const hasNode = await exec(cfg, vmid, ['node', '--version'], 'check Node.js', logger).then(() => true).catch(() => false)
+  if (!hasNode) {
+    await exec(
+      cfg, vmid,
+      ['bash', '-c',
+        'apt-get update -qq && apt-get install -y -qq curl && ' +
+        'curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && ' +
+        'apt-get install -y -qq nodejs',
+      ],
+      'install Node.js 22',
+      logger,
+    )
+  }
+
+  // Step 2 — create directories
+  await exec(cfg, vmid, ['mkdir', '-p', '/opt/ninja-log-agent'], 'create log-agent directory', logger)
+
+  // Step 3 — download log-agent archive
+  await exec(
+    cfg, vmid,
+    ['bash', '-c', `curl -fsSL ${controlPlaneUrl}/api/log-agents/download -o /opt/ninja-log-agent/log-agent.tar.gz`],
+    'download log-agent archive',
+    logger,
+  )
+
+  // Step 4 — extract
+  await exec(
+    cfg, vmid,
+    ['bash', '-c', 'tar -xzf /opt/ninja-log-agent/log-agent.tar.gz -C /opt/ninja-log-agent'],
+    'extract log-agent archive',
+    logger,
+  )
+
+  // Step 5 — write .env
+  const envContent = [
+    `NODE_ID=${nodeId}`,
+    `VMID=${vmid}`,
+    `CONTROL_PLANE_URL=${controlPlaneUrl}`,
+    `AGENT_SECRET=${config.AGENT_SECRET}`,
+    ...(logUnits ? [`LOG_UNITS=${logUnits}`] : []),
+  ].join('\n') + '\n'
+  const envB64 = Buffer.from(envContent).toString('base64')
+
+  await exec(
+    cfg, vmid,
+    ['bash', '-c', `echo '${envB64}' | base64 -d > /opt/ninja-log-agent/.env`],
+    'write .env file',
+    logger,
+  )
+
+  // Step 6 — write systemd unit
+  const unitContent = [
+    '[Unit]',
+    'Description=ninja-ops log-agent',
+    'After=network.target',
+    '',
+    '[Service]',
+    'Type=simple',
+    'WorkingDirectory=/opt/ninja-log-agent',
+    'EnvironmentFile=/opt/ninja-log-agent/.env',
+    'ExecStart=/usr/bin/node /opt/ninja-log-agent/index.js',
+    'Restart=always',
+    'RestartSec=5',
+    '',
+    '[Install]',
+    'WantedBy=multi-user.target',
+  ].join('\n') + '\n'
+  const unitB64 = Buffer.from(unitContent).toString('base64')
+
+  await exec(
+    cfg, vmid,
+    ['bash', '-c', `echo '${unitB64}' | base64 -d > /etc/systemd/system/ninja-log-agent.service`],
+    'write systemd unit',
+    logger,
+  )
+
+  // Step 7 — enable and start
+  await exec(
+    cfg, vmid,
+    ['bash', '-c', 'systemctl daemon-reload && systemctl enable ninja-log-agent && systemctl start ninja-log-agent'],
+    'enable and start log-agent service',
+    logger,
+  )
+}

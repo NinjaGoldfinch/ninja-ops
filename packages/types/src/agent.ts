@@ -5,12 +5,16 @@ import { z } from 'zod'
 export const AgentStatusSchema = z.enum(['idle', 'busy', 'offline'])
 export type AgentStatus = z.infer<typeof AgentStatusSchema>
 
+export const AgentKindSchema = z.enum(['deploy', 'log'])
+export type AgentKind = z.infer<typeof AgentKindSchema>
+
 export const AgentSchema = z.object({
   id: z.string().uuid(),
   nodeId: z.string().uuid(),
   vmid: z.number().int().positive(),
   hostname: z.string(),
   version: z.string(),              // semver of the agent package
+  kind: AgentKindSchema,
   status: AgentStatusSchema,
   lastSeenAt: z.string().datetime(),
   registeredAt: z.string().datetime(),

@@ -95,9 +95,10 @@ export const registerWebSocket = fp(async function wsPlugin(app: FastifyInstance
           handleTerminalClose(msg.sessionId)
           break
         case 'subscribe_logs':
+          sessionManager.subscribeLog(connectionId, msg.vmid)
+          break
         case 'unsubscribe_logs':
-          // Log subscriptions handled by log-service — not implemented yet
-          socket.send(JSON.stringify({ type: 'error', code: 'NOT_IMPLEMENTED', message: 'Log subscriptions not yet implemented' }))
+          sessionManager.unsubscribeLog(connectionId, msg.vmid)
           break
         case 'subscribe_control_logs':
           if (session.role === 'admin') {

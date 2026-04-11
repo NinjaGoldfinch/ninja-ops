@@ -24,7 +24,8 @@ export const ProvisioningJobSchema = z.object({
   name:         z.string(),
   proxmoxUpid:  z.string().nullable(),
   state:        ProvisioningStateSchema,
-  deployAgent:  z.boolean(),
+  deployAgent:    z.boolean(),
+  deployLogAgent: z.boolean(),
   errorMessage: z.string().nullable(),
   createdAt:    z.string().datetime(),
   updatedAt:    z.string().datetime(),
@@ -66,6 +67,7 @@ export const LxcCreateRequestSchema = z.object({
   startAfterCreate: z.boolean().default(true),
   tags:             z.array(z.string()).default([]),
   deployAgent:      z.boolean().default(false),
+  deployLogAgent:   z.boolean().default(false),
 })
 export type LxcCreateRequest = z.infer<typeof LxcCreateRequestSchema>
 

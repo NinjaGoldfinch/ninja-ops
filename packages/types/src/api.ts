@@ -88,6 +88,7 @@ export const AUDIT_ACTIONS = [
   'provision_qemu',
   'provision_delete',
   'agent_deploy',
+  'log_agent_deploy',
   'guest_delete',
 ] as const
 export const AuditActionSchema = z.enum(AUDIT_ACTIONS)

@@ -35,7 +35,7 @@ function AgentsPage() {
         <table className="w-full text-left">
           <thead className="bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
             <tr>
-              <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">Hostname</th>
+              <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">Agent</th>
               <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">VMID</th>
               <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">Version</th>
               <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">Status</th>
@@ -59,6 +59,7 @@ function AgentsPage() {
                   >
                     <td className="px-4 py-2.5 font-mono text-sm text-zinc-900 dark:text-zinc-100">
                       {agent.hostname}
+                      <span className="text-zinc-400 dark:text-zinc-600">:{agent.kind}</span>
                     </td>
                     <td className="px-4 py-2.5 font-mono text-xs text-zinc-500 dark:text-zinc-400">
                       {agent.vmid}
@@ -92,7 +93,7 @@ function AgentsPage() {
                           size="icon"
                           className="text-red-500 hover:text-red-600"
                           onClick={() => {
-                            if (confirm(`Delete agent ${agent.hostname}?`)) {
+                            if (confirm(`Delete agent ${agent.hostname}:${agent.kind}?`)) {
                               deleteAgent(agent.id, {
                                 onSuccess: () => toast({ title: 'Agent deleted', variant: 'success' }),
                                 onError: (err) =>

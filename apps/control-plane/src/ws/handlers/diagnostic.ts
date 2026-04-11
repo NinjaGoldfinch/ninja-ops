@@ -45,8 +45,11 @@ export async function handleDiagnosticExec(
     tokenSecret: withSecret.tokenSecret,
     nodeName: withSecret.node.name,
     sshUser: withSecret.node.sshUser,
-    sshPassword: withSecret.sshPassword,
     sshHost: withSecret.sshHost,
+    sshAuthMethod: withSecret.sshAuthMethod,
+    sshPassword: withSecret.sshPassword,
+    sshPrivateKey: withSecret.sshPrivateKey,
+    sshKeyPassphrase: withSecret.sshKeyPassphrase,
   }
 
   send(socket, {

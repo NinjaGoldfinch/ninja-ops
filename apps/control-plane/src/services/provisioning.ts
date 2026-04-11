@@ -24,6 +24,7 @@ interface DbProvisioningJob {
   proxmox_upid: string | null
   state: string
   deploy_agent: boolean
+  deploy_log_agent: boolean
   config: unknown
   error_message: string | null
   created_at: Date
@@ -40,6 +41,7 @@ function toJob(row: DbProvisioningJob): ProvisioningJob {
     proxmoxUpid: row.proxmox_upid,
     state: row.state as ProvisioningState,
     deployAgent: row.deploy_agent,
+    deployLogAgent: row.deploy_log_agent,
     errorMessage: row.error_message,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
@@ -68,13 +70,14 @@ export class ProvisioningService {
     }
 
     const rows = await sql<DbProvisioningJob[]>`
-      INSERT INTO provisioning_jobs (node_id, guest_type, vmid, name, deploy_agent, config)
+      INSERT INTO provisioning_jobs (node_id, guest_type, vmid, name, deploy_agent, deploy_log_agent, config)
       VALUES (
         ${nodeId},
         ${guestType},
         ${vmid},
         ${name},
         ${'deployAgent' in params ? params.deployAgent : false},
+        ${'deployLogAgent' in params ? params.deployLogAgent : false},
         ${JSON.stringify(params)}::jsonb
       )
       RETURNING *

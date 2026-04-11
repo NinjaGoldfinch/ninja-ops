@@ -8,6 +8,7 @@ import { getSessionLogs, getJobSessions } from '../../services/job-logger.js'
 import { AppError } from '../../errors.js'
 import { requireRole } from '../../plugins/rbac.js'
 import { Client as SshClient } from 'ssh2'
+import { resolveSecret } from '../../lib/onepassword.js'
 
 const TestSshSchema = z.object({
   nodeId: z.string().uuid(),
@@ -61,13 +62,19 @@ export default async function diagnosticsRoutes(app: FastifyInstance) {
             apiStatus = 'error'
           }
 
-          if (withSecret.sshPassword) {
+          const hasSshCred = withSecret.sshAuthMethod === 'key'
+            ? !!withSecret.sshPrivateKey
+            : !!withSecret.sshPassword
+          if (hasSshCred) {
             try {
               await Promise.race([
                 testSshConnection({
                   host: withSecret.sshHost ?? node.host,
                   username: node.sshUser ?? 'root',
+                  authMethod: withSecret.sshAuthMethod,
                   password: withSecret.sshPassword,
+                  privateKey: withSecret.sshPrivateKey,
+                  keyPassphrase: withSecret.sshKeyPassphrase,
                 }),
                 new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 5_000)),
               ])
@@ -101,15 +108,28 @@ export default async function diagnosticsRoutes(app: FastifyInstance) {
         )
       }
 
-      const { node, sshPassword, sshHost } = await nodeService.getWithSecret(body.data.nodeId)
+      const { node, sshPassword, sshHost, sshAuthMethod, sshPrivateKey, sshKeyPassphrase } = await nodeService.getWithSecret(body.data.nodeId)
 
-      if (!sshPassword) {
-        throw AppError.validationError('SSH password not configured for this node', [])
+      const hasCred = sshAuthMethod === 'key' ? !!sshPrivateKey : !!sshPassword
+      if (!hasCred) {
+        throw AppError.validationError('SSH credentials not configured for this node', [])
       }
 
       const host = sshHost ?? node.host
       const start = Date.now()
-      await testSshConnection({ host, username: node.sshUser ?? 'root', password: sshPassword })
+      try {
+        await testSshConnection({
+          host,
+          username: node.sshUser ?? 'root',
+          authMethod: sshAuthMethod,
+          password: sshPassword,
+          privateKey: sshPrivateKey,
+          keyPassphrase: sshKeyPassphrase,
+        })
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        throw AppError.validationError(`SSH connection failed: ${msg}`, [])
+      }
       const latencyMs = Date.now() - start
 
       return reply.send({
@@ -143,7 +163,34 @@ export default async function diagnosticsRoutes(app: FastifyInstance) {
 
 // ── SSH connectivity helper ────────────────────────────────────────────────
 
-function testSshConnection({ host, username, password }: { host: string; username: string; password: string }): Promise<void> {
+interface SshTestOptions {
+  host: string
+  username: string
+  authMethod?: string | null
+  password?: string | null
+  privateKey?: string | null
+  keyPassphrase?: string | null
+}
+
+async function testSshConnection(opts: SshTestOptions): Promise<void> {
+  const connectCfg: Parameters<SshClient['connect']>[0] = {
+    host: opts.host,
+    port: 22,
+    username: opts.username,
+    hostVerifier: () => true,
+  }
+
+  if (opts.authMethod === 'key') {
+    if (!opts.privateKey) throw new Error('SSH auth method is "key" but no private key provided')
+    connectCfg.privateKey = await resolveSecret(opts.privateKey)
+    if (opts.keyPassphrase) {
+      connectCfg.passphrase = await resolveSecret(opts.keyPassphrase)
+    }
+  } else {
+    if (!opts.password) throw new Error('SSH auth method is "password" but no password provided')
+    connectCfg.password = opts.password
+  }
+
   return new Promise((resolve, reject) => {
     const conn = new SshClient()
     conn.on('ready', () => {
@@ -163,12 +210,6 @@ function testSshConnection({ host, username, password }: { host: string; usernam
     conn.on('error', (err) => {
       reject(new Error(`SSH connection failed: ${err.message}`))
     })
-    conn.connect({
-      host,
-      port: 22,
-      username,
-      password,
-      hostVerifier: () => true,
-    })
+    conn.connect(connectCfg)
   })
 }

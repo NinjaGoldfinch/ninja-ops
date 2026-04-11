@@ -73,3 +73,89 @@ export const LogSubscriptionSchema = z.object({
   search: z.string().max(256).optional(),
 })
 export type LogSubscription = z.infer<typeof LogSubscriptionSchema>
+
+// ── Log agent registration ────────────────────────────────────────────────
+
+export const LogAgentRegisterRequestSchema = z.object({
+  nodeId:   z.string().uuid(),
+  vmid:     z.number().int().positive(),
+  secret:   z.string().min(32),
+  version:  z.string(),
+  hostname: z.string().optional(),
+})
+export type LogAgentRegisterRequest = z.infer<typeof LogAgentRegisterRequestSchema>
+
+export const LogAgentRegisterResponseSchema = z.object({
+  agentId: z.string().uuid(),
+  token:   z.string(),
+})
+export type LogAgentRegisterResponse = z.infer<typeof LogAgentRegisterResponseSchema>
+
+// ── Log entry (API response / DB row shape) ───────────────────────────────
+
+export const LOG_SOURCES = ['app', 'agent', 'shell', 'system'] as const
+export const LogEntryRowSchema = z.object({
+  id:     z.number().int(),
+  vmid:   z.number().int(),
+  nodeId: z.string().uuid(),
+  source: z.enum(LOG_SOURCES),
+  unit:   z.string().nullable(),
+  level:  LogLevelSchema,
+  line:   z.string(),
+  ts:     z.number().int(),   // unix ms
+})
+export type LogEntryRow = z.infer<typeof LogEntryRowSchema>
+
+// ── WebSocket message shapes (/ws/log-agent) ─────────────────────────────
+
+// log-agent → control plane
+export const LogAgentClientMessageSchema = z.discriminatedUnion('type', [
+  z.object({
+    type:    z.literal('auth'),
+    agentId: z.string().uuid(),
+    token:   z.string(),
+  }),
+  z.object({
+    type:    z.literal('heartbeat'),
+    agentId: z.string().uuid(),
+    ts:      z.string().datetime(),
+  }),
+  z.object({
+    type:   z.literal('log_line'),
+    vmid:   z.number().int().positive(),
+    nodeId: z.string().uuid(),
+    source: z.enum(LOG_SOURCES),
+    unit:   z.string().optional(),
+    level:  LogLevelSchema,
+    line:   z.string(),
+    ts:     z.number().int(),   // unix ms
+  }),
+])
+export type LogAgentClientMessage = z.infer<typeof LogAgentClientMessageSchema>
+
+// control plane → log-agent
+export const LogAgentServerMessageSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('auth_ok') }),
+  z.object({
+    type:    z.literal('error'),
+    code:    z.string(),
+    message: z.string(),
+  }),
+])
+export type LogAgentServerMessage = z.infer<typeof LogAgentServerMessageSchema>
+
+// ── Log query params (REST) ───────────────────────────────────────────────
+
+export const LogQueryParamsSchema = z.object({
+  vmid:   z.coerce.number().int().positive().optional(),
+  nodeId: z.string().uuid().optional(),
+  source: z.enum(LOG_SOURCES).optional(),
+  level:  LogLevelSchema.optional(),
+  unit:   z.string().optional(),
+  from:   z.coerce.number().int().optional(),   // unix ms
+  to:     z.coerce.number().int().optional(),   // unix ms
+  search: z.string().max(256).optional(),
+  limit:  z.coerce.number().int().min(1).max(1000).default(200),
+  cursor: z.coerce.number().int().optional(),   // last seen id for pagination
+})
+export type LogQueryParams = z.infer<typeof LogQueryParamsSchema>

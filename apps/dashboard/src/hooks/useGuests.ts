@@ -84,6 +84,17 @@ export function useDeployAgent() {
   })
 }
 
+export function useDeployLogAgent() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ nodeId, vmid, logUnits }: { nodeId: string; vmid: number; logUnits?: string }) =>
+      api.post<{ deployed: boolean; sessionId: string }>(`/api/nodes/${nodeId}/guests/${vmid}/deploy-log-agent`, { logUnits: logUnits ?? '' }),
+    onSuccess: (_data, { nodeId, vmid }) => {
+      void queryClient.invalidateQueries({ queryKey: ['job-logs', 'job', 'log_agent_deploy', `${nodeId}/${vmid}`] })
+    },
+  })
+}
+
 export function useDeleteSnapshot() {
   const queryClient = useQueryClient()
   return useMutation({

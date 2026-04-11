@@ -32,8 +32,15 @@ const ConfigSchema = z.object({
   // Path to the compiled deploy-agent bundle served at GET /api/agents/download
   AGENT_BUNDLE_PATH: z.string().default(resolve(packageRoot, 'agent-bundle.tar.gz')),
 
+  // Path to the compiled log-agent bundle served at GET /api/log-agents/download
+  LOG_AGENT_BUNDLE_PATH: z.string().default(resolve(packageRoot, 'log-agent-bundle.tar.gz')),
+
   RATE_LIMIT_MAX: z.coerce.number().default(100),
   RATE_LIMIT_WINDOW: z.coerce.number().default(60_000),
+
+  // 1Password service account token — required only when op:// secret references are used
+  // for SSH private keys. Get one at: https://developer.1password.com/docs/service-accounts/
+  OP_SERVICE_ACCOUNT_TOKEN: z.string().optional(),
 })
 
 const parsed = ConfigSchema.safeParse(process.env)

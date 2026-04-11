@@ -5,16 +5,19 @@ import { z } from 'zod'
 export const NodeStatusSchema = z.enum(['online', 'offline', 'unknown'])
 export type NodeStatus = z.infer<typeof NodeStatusSchema>
 
+export const SshAuthMethodSchema = z.enum(['password', 'key'])
+export type SshAuthMethod = z.infer<typeof SshAuthMethodSchema>
+
 export const ProxmoxNodeSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(64),
   host: z.string().min(1),        // IP or hostname
   port: z.number().int().min(1).max(65535).default(8006),
   tokenId: z.string().min(1),     // e.g. manager@pve!app
-  // tokenSecret is never exposed in responses — omitted here, stored encrypted
-  // sshPassword is never exposed — stored encrypted
+  // tokenSecret / sshPassword / sshPrivateKey / sshKeyPassphrase never exposed — stored encrypted
   sshUser: z.string().default('root'),
-  sshHost: z.string().optional(),   // overrides host for SSH; useful when API host is a public IP
+  sshHost: z.string().optional(),      // overrides host for SSH; useful when API host is a public IP
+  sshAuthMethod: SshAuthMethodSchema.default('password'),
   status: NodeStatusSchema,
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -28,8 +31,30 @@ export const CreateNodeRequestSchema = ProxmoxNodeSchema.omit({
   updatedAt: true,
 }).extend({
   tokenSecret: z.string().min(1),
+  // password auth
+  sshPassword: z.string().optional(),
+  // key auth — PEM string or an op:// 1Password secret reference
+  sshPrivateKey: z.string().optional(),
+  sshKeyPassphrase: z.string().optional(),
 })
 export type CreateNodeRequest = z.infer<typeof CreateNodeRequestSchema>
+
+export const UpdateNodeRequestSchema = z.object({
+  name: z.string().min(1).max(64).optional(),
+  host: z.string().min(1).optional(),
+  port: z.number().int().min(1).max(65535).optional(),
+  tokenId: z.string().min(1).optional(),
+  tokenSecret: z.string().min(1).optional(),
+  sshUser: z.string().optional(),
+  sshHost: z.string().optional(),
+  sshAuthMethod: SshAuthMethodSchema.optional(),
+  // password auth
+  sshPassword: z.string().optional(),
+  // key auth
+  sshPrivateKey: z.string().optional(),
+  sshKeyPassphrase: z.string().optional(),
+})
+export type UpdateNodeRequest = z.infer<typeof UpdateNodeRequestSchema>
 
 // ── Guest (VM or LXC container) ───────────────────────────────────────────
 

@@ -40,7 +40,15 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     return undefined as T
   }
 
-  const data = (await response.json()) as { ok: boolean; data?: T } & ApiError
+  let data: ({ ok: boolean; data?: T } & ApiError)
+  try {
+    data = (await response.json()) as { ok: boolean; data?: T } & ApiError
+  } catch {
+    throw new ApiRequestError(
+      'PARSE_ERROR',
+      `Unexpected response from server (status ${response.status})`,
+    )
+  }
 
   if (!response.ok || !data.ok) {
     throw new ApiRequestError(

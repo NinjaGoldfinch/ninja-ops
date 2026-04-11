@@ -71,6 +71,7 @@ export function GuestTable({ guests, nodeId, isLoading, canPower, isAdmin }: Gue
               <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">CPU</th>
               <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">Mem</th>
               <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">Uptime</th>
+              <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">Agent</th>
               <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 dark:text-zinc-400"></th>
             </tr>
           </thead>
@@ -96,7 +97,7 @@ export function GuestTable({ guests, nodeId, isLoading, canPower, isAdmin }: Gue
                 ))}
             {!isLoading && filtered.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center">
+                <td colSpan={9} className="px-4 py-10 text-center">
                   <p className="text-sm text-zinc-500 dark:text-zinc-400">No guests found</p>
                 </td>
               </tr>

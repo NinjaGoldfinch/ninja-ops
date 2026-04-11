@@ -3,7 +3,7 @@ import { bullmqConnection } from '../db/redis.js'
 import { sql } from '../db/client.js'
 import { proxmoxService } from '../services/proxmox.js'
 import { nodeService } from '../services/node.js'
-import { deployAgentIntoLxc } from '../services/agent-deployer.js'
+import { deployAgentIntoLxc, deployLogAgentIntoLxc } from '../services/agent-deployer.js'
 import { JobLogger } from '../services/job-logger.js'
 import { sessionManager } from '../ws/session.js'
 import { AppError } from '../errors.js'
@@ -32,6 +32,7 @@ interface DbJob {
   proxmox_upid: string | null
   state: string
   deploy_agent: boolean
+  deploy_log_agent: boolean
   config: LxcCreateRequest | QemuCreateRequest
   error_message: string | null
   created_at: Date
@@ -48,6 +49,7 @@ function toJob(row: DbJob): ProvisioningJob {
     proxmoxUpid: row.proxmox_upid,
     state: row.state as ProvisioningState,
     deployAgent: row.deploy_agent,
+    deployLogAgent: row.deploy_log_agent,
     errorMessage: row.error_message,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
@@ -83,7 +85,7 @@ async function runProvisioningJob(jobId: string): Promise<void> {
   const row = rows[0]
   if (!row) throw new Error(`Provisioning job ${jobId} not found`)
 
-  const { node, tokenSecret, sshPassword, sshHost } = await nodeService.getWithSecret(row.node_id)
+  const { node, tokenSecret, sshPassword, sshHost, sshAuthMethod, sshPrivateKey, sshKeyPassphrase } = await nodeService.getWithSecret(row.node_id)
   const cfg = {
     host: node.host,
     port: node.port,
@@ -91,8 +93,11 @@ async function runProvisioningJob(jobId: string): Promise<void> {
     tokenSecret,
     nodeName: node.name,
     sshUser: node.sshUser,
-    sshPassword,
     sshHost,
+    sshAuthMethod,
+    sshPassword,
+    sshPrivateKey,
+    sshKeyPassphrase,
   }
 
   // postgres.js auto-parses JSONB columns, but guard against it returning a raw string
@@ -133,12 +138,21 @@ async function runProvisioningJob(jobId: string): Promise<void> {
     }
   }
 
-  // LXC + deployAgent → deploying → done
-  if (row.guest_type === 'lxc' && row.deploy_agent) {
+  // LXC + deployAgent → deploying (deploy-agent first, then log-agent) → done
+  if (row.guest_type === 'lxc' && (row.deploy_agent || row.deploy_log_agent)) {
     await transition(jobId, 'deploying')
-    const logger = new JobLogger('provisioning', jobId)
-    await deployAgentIntoLxc(cfg, row.vmid, row.node_id, logger)
-    await logger.flush()
+
+    if (row.deploy_agent) {
+      const logger = new JobLogger('provisioning', jobId)
+      await deployAgentIntoLxc(cfg, row.vmid, row.node_id, logger)
+      await logger.flush()
+    }
+
+    if (row.deploy_log_agent) {
+      const logger = new JobLogger('log_agent_deploy', `${row.node_id}/${row.vmid}`)
+      await deployLogAgentIntoLxc(cfg, row.vmid, row.node_id, '', logger)
+      await logger.flush()
+    }
   }
 
   await transition(jobId, 'done')

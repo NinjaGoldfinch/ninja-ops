@@ -1,0 +1,26 @@
+{
+  "name": "@ninja/log-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file=../../env/log-agent.env src/index.ts",
+    "build": "tsc",
+    "package": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=esm --external:node:* --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\" --outfile=dist-bundle/index.js && node ../../scripts/package-log-agent.mjs",
+    "start": "node --env-file=../../env/log-agent.env dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@ninja/types": "workspace:*",
+    "ws": "^8",
+    "zod": "^3.23"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/ws": "^8",
+    "esbuild": "^0.25",
+    "tsx": "^4",
+    "typescript": "^5.5"
+  }
+}

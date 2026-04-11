@@ -11,6 +11,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/audit': 'Audit Log',
   '/settings': 'Settings',
   '/diagnostics': 'Diagnostics',
+  '/logs': 'Logs',
 }
 
 function getTitle(pathname: string): string {
