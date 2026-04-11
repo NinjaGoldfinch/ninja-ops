@@ -344,6 +344,9 @@ interface SavedCommand {
   command: string
 }
 
+// TODO: commands are stored in component state only and do not persist.
+// Implement GET/POST/DELETE /api/nodes/:nodeId/guests/:vmid/commands
+// backed by the saved_commands table once the control-plane routes exist.
 function CommandsTab({
   nodeId,
   vmid,

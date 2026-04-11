@@ -10,6 +10,7 @@ import {
   Zap,
   Layers,
   Stethoscope,
+  PlusSquare,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUiStore } from '@/stores/ui'
@@ -18,6 +19,7 @@ const navItems = [
   { to: '/', label: 'Overview', icon: LayoutDashboard },
   { to: '/nodes', label: 'Nodes', icon: Server },
   { to: '/containers', label: 'Containers', icon: Layers },
+  { to: '/provision', label: 'Provision', icon: PlusSquare },
   { to: '/agents', label: 'Agents', icon: Bot },
   { to: '/audit', label: 'Audit', icon: ClipboardList },
   { to: '/diagnostics', label: 'Diagnostics', icon: Stethoscope },

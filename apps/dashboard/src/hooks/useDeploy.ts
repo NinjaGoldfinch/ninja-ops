@@ -100,7 +100,7 @@ export function useTriggerDeploy() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (targetId: string) =>
-      api.post<DeployJob>(`/api/deploy/targets/${targetId}/trigger`, {}),
+      api.post<DeployJob>('/api/deploy/jobs', { targetId }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['deploy-jobs'] })
     },
@@ -110,7 +110,7 @@ export function useTriggerDeploy() {
 export function useCancelDeployJob() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (jobId: string) => api.post<void>(`/api/deploy/jobs/${jobId}/cancel`, {}),
+    mutationFn: (jobId: string) => api.delete<void>(`/api/deploy/jobs/${jobId}`),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['deploy-jobs'] })
     },
