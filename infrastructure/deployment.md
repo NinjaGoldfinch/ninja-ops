@@ -42,11 +42,10 @@ Nothing needs to be installed on the Proxmox host — all scripts are fetched di
 RAW="https://raw.githubusercontent.com/NinjaGoldfinch/ninja-ops/main"
 
 # ── Prompt for user-defined values ────────────────────────────────────────────
-_prompt() { printf '\033[0;36m[ninja]\033[0m %s [%s]: ' "$1" "$2"; read -r _v; printf '%s' "${_v:-$2}"; }
-
-ADMIN_USERNAME=$(_prompt "Admin username" "admin")
-printf '\033[0;36m[ninja]\033[0m Admin password [leave blank to auto-generate]: '; read -r -s _pw; printf '\n'
-ADMIN_PASSWORD="${_pw:-$(openssl rand -hex 12)}"
+printf '\033[0;36m[ninja]\033[0m Admin username [admin]: ' >/dev/tty; read -r ADMIN_USERNAME </dev/tty
+ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
+printf '\033[0;36m[ninja]\033[0m Admin password [leave blank to auto-generate]: ' >/dev/tty; read -r -s ADMIN_PASSWORD </dev/tty; printf '\n' >/dev/tty
+ADMIN_PASSWORD="${ADMIN_PASSWORD:-$(openssl rand -hex 12)}"
 
 # ── Generate secrets ──────────────────────────────────────────────────────────
 # Uses openssl rand -hex, the same output format as gen_hex in scripts/setup-env.sh
@@ -77,15 +76,15 @@ EOF
 printf '\n\033[0;33m── Save these to your password manager ──\033[0m\n\n'
 cat /tmp/ninja-deploy.env
 printf '\n\033[0;33m─────────────────────────────────────────\033[0m\n\n'
-read -r -p "Press Enter once saved... "
+read -r -p "Press Enter once saved... " </dev/tty
 
 # ── Deploy ────────────────────────────────────────────────────────────────────
 set -a; source /tmp/ninja-deploy.env; set +a
 
-curl -sSL "${RAW}/infrastructure/scripts/setup-postgres.sh"      | bash
-curl -sSL "${RAW}/infrastructure/scripts/setup-redis.sh"         | bash
-curl -sSL "${RAW}/infrastructure/scripts/setup-control-plane.sh" | bash
-curl -sSL "${RAW}/infrastructure/scripts/setup-dashboard.sh"     | bash
+bash <(curl -sSL "${RAW}/infrastructure/scripts/setup-postgres.sh")
+bash <(curl -sSL "${RAW}/infrastructure/scripts/setup-redis.sh")
+bash <(curl -sSL "${RAW}/infrastructure/scripts/setup-control-plane.sh")
+bash <(curl -sSL "${RAW}/infrastructure/scripts/setup-dashboard.sh")
 
 # ── Clean up ──────────────────────────────────────────────────────────────────
 rm /tmp/ninja-deploy.env
