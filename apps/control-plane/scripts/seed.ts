@@ -17,8 +17,8 @@ if (!password) {
 
 const sql = postgres(databaseUrl)
 
-async function seed() {
-  const hash = await bcrypt.hash(password, 12)
+async function seed(pw: string) {
+  const hash = await bcrypt.hash(pw, 12)
 
   const existing = await sql<{ id: string }[]>`
     SELECT id FROM users WHERE username = ${username}
@@ -37,7 +37,7 @@ async function seed() {
   await sql.end()
 }
 
-seed().catch((err) => {
+seed(password).catch((err) => {
   console.error('Seed failed:', err)
   process.exit(1)
 })
