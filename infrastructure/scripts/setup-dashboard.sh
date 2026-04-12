@@ -112,14 +112,16 @@ if [ "${_NINJA_COMMON_LOADED:-}" != "1" ]; then
   }
   exec_ct() { pct exec "$1" -- bash -c "$2"; }
   install_base_packages() {
-    exec_ct "$1" "apt-get update -qq && apt-get upgrade -y -qq && \
-      apt-get install -y -qq curl wget gnupg ca-certificates sudo htop lsb-release iproute2 iputils-ping"
+    exec_ct "$1" "DEBIAN_FRONTEND=noninteractive apt-get update -qq && \
+      DEBIAN_FRONTEND=noninteractive apt-get install -y -qq locales && \
+      sed -i 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && locale-gen && \
+      LANG=en_US.UTF-8 DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq && \
+      LANG=en_US.UTF-8 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+        curl wget gnupg ca-certificates sudo htop lsb-release iproute2 iputils-ping"
   }
   configure_locale_timezone() {
     exec_ct "$1" "ln -sf /usr/share/zoneinfo/$2 /etc/localtime && \
-      dpkg-reconfigure -f noninteractive tzdata && \
-      apt-get install -y -qq locales && \
-      sed -i 's/# en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen && locale-gen"
+      DEBIAN_FRONTEND=noninteractive dpkg-reconfigure -f noninteractive tzdata"
   }
   strip_cidr() { printf '%s' "${1%%/*}"; }
   OPT_YES=${OPT_YES:-0}; OPT_FORCE=${OPT_FORCE:-0}
@@ -172,7 +174,7 @@ Environment variables (all optional):
   CT_SWAP            Swap in MB (default: 256)
   CT_CORES           CPU cores (default: 1)
   CT_TEMPLATE_STORAGE  Template storage (default: local)
-  CT_TEMPLATE_DISTRO   Distro pattern (default: 13.4-slim)
+  CT_TEMPLATE_DISTRO   Distro pattern (default: debian-13-standard)
   NET_BRIDGE         Network bridge (default: vmbr0)
   NET_IP             IP with CIDR (default: 10.0.0.21/24)
   NET_GW             Gateway (default: 10.0.0.1)
@@ -208,7 +210,7 @@ CT_MEMORY="${DASH_MEMORY:-512}"
 CT_SWAP="${DASH_SWAP:-256}"
 CT_CORES="${DASH_CORES:-1}"
 CT_TEMPLATE_STORAGE="${CT_TEMPLATE_STORAGE:-local}"
-CT_TEMPLATE_DISTRO="${DASH_TEMPLATE:-13.4-slim}"
+CT_TEMPLATE_DISTRO="${DASH_TEMPLATE:-debian-13-standard}"
 NET_BRIDGE="${DASH_NET_BRIDGE:-vmbr0}"
 NET_IP="${DASH_NET_IP:-10.0.0.21/24}"
 NET_GW="${DASH_NET_GW:-10.0.0.1}"

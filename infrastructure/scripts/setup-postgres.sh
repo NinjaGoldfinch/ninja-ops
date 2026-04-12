@@ -111,14 +111,16 @@ if [ "${_NINJA_COMMON_LOADED:-}" != "1" ]; then
   }
   exec_ct() { pct exec "$1" -- bash -c "$2"; }
   install_base_packages() {
-    exec_ct "$1" "apt-get update -qq && apt-get upgrade -y -qq && \
-      apt-get install -y -qq curl wget gnupg ca-certificates sudo htop lsb-release git iproute2 iputils-ping"
+    exec_ct "$1" "DEBIAN_FRONTEND=noninteractive apt-get update -qq && \
+      DEBIAN_FRONTEND=noninteractive apt-get install -y -qq locales && \
+      sed -i 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && locale-gen && \
+      LANG=en_US.UTF-8 DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq && \
+      LANG=en_US.UTF-8 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+        curl wget gnupg ca-certificates sudo htop lsb-release git iproute2 iputils-ping"
   }
   configure_locale_timezone() {
     exec_ct "$1" "ln -sf /usr/share/zoneinfo/$2 /etc/localtime && \
-      dpkg-reconfigure -f noninteractive tzdata && \
-      apt-get install -y -qq locales && \
-      sed -i 's/# en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen && locale-gen"
+      DEBIAN_FRONTEND=noninteractive dpkg-reconfigure -f noninteractive tzdata"
   }
   strip_cidr() { printf '%s' "${1%%/*}"; }
   OPT_YES=${OPT_YES:-0}; OPT_FORCE=${OPT_FORCE:-0}
@@ -167,7 +169,7 @@ Environment variables (all optional, sensible defaults provided):
   CT_SWAP               Swap in MB (default: 512)
   CT_CORES              CPU cores (default: 2)
   CT_TEMPLATE_STORAGE   Template storage (default: local)
-  CT_TEMPLATE_DISTRO    Distro pattern (default: 13.4-slim)
+  CT_TEMPLATE_DISTRO    Distro pattern (default: debian-13-standard)
   NET_BRIDGE            Network bridge (default: vmbr0)
   NET_IP                IP with CIDR (default: 10.0.0.10/24)
   NET_GW                Gateway (default: 10.0.0.1)
@@ -202,7 +204,7 @@ CT_MEMORY="${PG_MEMORY:-1024}"
 CT_SWAP="${PG_SWAP:-512}"
 CT_CORES="${PG_CORES:-2}"
 CT_TEMPLATE_STORAGE="${CT_TEMPLATE_STORAGE:-local}"
-CT_TEMPLATE_DISTRO="${PG_TEMPLATE:-13.4-slim}"
+CT_TEMPLATE_DISTRO="${PG_TEMPLATE:-debian-13-standard}"
 NET_BRIDGE="${PG_NET_BRIDGE:-vmbr0}"
 NET_IP="${PG_NET_IP:-10.0.0.10/24}"
 NET_GW="${PG_NET_GW:-10.0.0.1}"
@@ -289,7 +291,7 @@ log_ok "PostgreSQL configured"
 
 # ── Create database and user ─────────────────────────────────────────────────
 log_info "Creating database and user..."
-exec_ct "$CT_ID" "systemctl restart postgresql"
+exec_ct "$CT_ID" "pg_ctlcluster ${PG_VERSION} main restart"
 
 exec_ct "$CT_ID" "su -c \"psql -c \\\"CREATE USER ${PG_USER} WITH PASSWORD '${PG_PASSWORD}'\\\"\" postgres" 2>/dev/null || \
   log_warn "User ${PG_USER} may already exist"
@@ -297,7 +299,7 @@ exec_ct "$CT_ID" "su -c \"psql -c \\\"CREATE USER ${PG_USER} WITH PASSWORD '${PG
 exec_ct "$CT_ID" "su -c \"psql -c \\\"CREATE DATABASE ${PG_DB} OWNER ${PG_USER}\\\"\" postgres" 2>/dev/null || \
   log_warn "Database ${PG_DB} may already exist"
 
-exec_ct "$CT_ID" "systemctl restart postgresql && systemctl enable postgresql"
+exec_ct "$CT_ID" "pg_ctlcluster ${PG_VERSION} main restart && update-rc.d postgresql enable"
 log_ok "PostgreSQL is running and enabled"
 
 # ── Verify ───────────────────────────────────────────────────────────────────

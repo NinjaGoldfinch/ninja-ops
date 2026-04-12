@@ -198,17 +198,21 @@ exec_ct() { pct exec "$1" -- bash -c "$2"; }
 
 # ── Base package installation ────────────────────────────────────────────────
 install_base_packages() {  # $1 = CT_ID
-  exec_ct "$1" "apt-get update -qq && apt-get upgrade -y -qq && \
-    apt-get install -y -qq curl wget gnupg ca-certificates sudo htop lsb-release git iproute2 iputils-ping"
+  # Install locales first so subsequent apt runs don't emit perl warnings
+  exec_ct "$1" "DEBIAN_FRONTEND=noninteractive apt-get update -qq && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq locales && \
+    sed -i 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && \
+    locale-gen && \
+    LANG=en_US.UTF-8 DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq && \
+    LANG=en_US.UTF-8 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+      curl wget gnupg ca-certificates sudo htop lsb-release git iproute2 iputils-ping"
 }
 
 # ── Locale and timezone ─────────────────────────────────────────────────────
 configure_locale_timezone() {  # $1 = CT_ID, $2 = timezone
+  # Locales already installed in install_base_packages; just set timezone
   exec_ct "$1" "ln -sf /usr/share/zoneinfo/$2 /etc/localtime && \
-    dpkg-reconfigure -f noninteractive tzdata && \
-    apt-get install -y -qq locales && \
-    sed -i 's/# en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen && \
-    locale-gen"
+    DEBIAN_FRONTEND=noninteractive dpkg-reconfigure -f noninteractive tzdata"
 }
 
 # ── Interactive prompt ───────────────────────────────────────────────────────
