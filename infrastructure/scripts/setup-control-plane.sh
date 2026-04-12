@@ -33,7 +33,7 @@ if [ "${_NINJA_COMMON_LOADED:-}" != "1" ]; then
     command -v pct  >/dev/null 2>&1 || die "pct not found — run this on a Proxmox VE host"
     command -v pvesh >/dev/null 2>&1 || die "pvesh not found — run this on a Proxmox VE host"
   }
-  find_latest_template() { pveam available --section system | grep "$1" | sort -V | tail -1 | awk '{print $2}' || true; }
+  find_latest_template() { local _t; _t=$(pveam available --section oci 2>/dev/null | grep "$1" | sort -V | tail -1 | awk '{print $2}' || true); [ -n "$_t" ] && { printf '%s' "$_t"; return; }; pveam available --section system 2>/dev/null | grep "$1" | sort -V | tail -1 | awk '{print $2}' || true; }
   download_template() { pveam list "$1" | grep -q "$2" || pveam download "$1" "$2"; }
   create_lxc() {
     if pct status "$CT_ID" >/dev/null 2>&1; then

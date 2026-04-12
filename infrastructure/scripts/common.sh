@@ -40,7 +40,12 @@ check_proxmox_host() {
 
 # ── Template helpers ─────────────────────────────────────────────────────────
 find_latest_template() {  # $1 = distro pattern (e.g. "debian-13-slim")
-  pveam available --section system | grep "$1" | sort -V | tail -1 | awk '{print $2}' || true
+  local _t
+  # Try OCI registry first (Proxmox 8.2+)
+  _t=$(pveam available --section oci 2>/dev/null | grep "$1" | sort -V | tail -1 | awk '{print $2}' || true)
+  [ -n "$_t" ] && { printf '%s' "$_t"; return; }
+  # Fall back to standard system templates
+  pveam available --section system 2>/dev/null | grep "$1" | sort -V | tail -1 | awk '{print $2}' || true
 }
 
 download_template() {  # $1 = storage, $2 = template name
