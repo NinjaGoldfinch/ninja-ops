@@ -44,6 +44,7 @@ RAW="https://raw.githubusercontent.com/NinjaGoldfinch/ninja-ops/main"
 # ── Generate secrets ──────────────────────────────────────────────────────────
 # Uses openssl rand -hex, the same output format as gen_hex in scripts/setup-env.sh
 PG_PASSWORD=$(openssl rand -hex 16)
+REDIS_PASSWORD=$(openssl rand -hex 16)
 ADMIN_PASSWORD=$(openssl rand -hex 12)
 JWT_SECRET=$(openssl rand -hex 64)
 ENCRYPTION_KEY=$(openssl rand -hex 32)
@@ -55,8 +56,8 @@ cat > /tmp/ninja-deploy.env <<EOF
 PG_PASSWORD=${PG_PASSWORD}
 DATABASE_URL=postgres://ninja:${PG_PASSWORD}@10.0.0.10:5432/ninja_ops
 
-REDIS_PASSWORD=
-REDIS_URL=redis://10.0.0.11:6379
+REDIS_PASSWORD=${REDIS_PASSWORD}
+REDIS_URL=redis://:${REDIS_PASSWORD}@10.0.0.11:6379
 
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=${ADMIN_PASSWORD}
