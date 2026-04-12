@@ -55,6 +55,8 @@ create_lxc() {
   if pct status "$CT_ID" >/dev/null 2>&1; then
     log_warn "CT $CT_ID already exists — skipping create"
   else
+    _net_args="name=eth0,bridge=${NET_BRIDGE},ip=${NET_IP}"
+    [ "$NET_IP" != "dhcp" ] && _net_args="${_net_args},gw=${NET_GW}"
     pct create "$CT_ID" "${CT_TEMPLATE_STORAGE}:vztmpl/${TEMPLATE}" \
       --hostname "$CT_HOSTNAME" \
       --storage  "$CT_STORAGE" \
@@ -62,7 +64,7 @@ create_lxc() {
       --memory   "$CT_MEMORY" \
       --swap     "$CT_SWAP" \
       --cores    "$CT_CORES" \
-      --net0     "name=eth0,bridge=${NET_BRIDGE},ip=${NET_IP},gw=${NET_GW}" \
+      --net0     "$_net_args" \
       --nameserver "$NET_DNS" \
       --unprivileged 1 \
       --features nesting=1 \
@@ -79,6 +81,18 @@ create_lxc() {
     i=$((i + 1))
   done
   [ "$i" -lt 30 ] || die "CT $CT_ID did not get network after 60s"
+
+  # If DHCP was used, detect assigned IP and make static
+  if [ "$NET_IP" = "dhcp" ]; then
+    log_info "Detecting DHCP-assigned IP for CT $CT_ID..."
+    sleep 2
+    NET_IP=$(pct exec "$CT_ID" -- ip -4 addr show eth0 | awk '/inet / {print $2}' | head -1)
+    NET_GW=$(pct exec "$CT_ID" -- ip route show default | awk '{print $3}' | head -1)
+    [ -n "$NET_IP" ] || die "Failed to detect DHCP-assigned IP for CT $CT_ID"
+    log_ok "DHCP assigned: $NET_IP (gw $NET_GW)"
+    pct set "$CT_ID" --net0 "name=eth0,bridge=${NET_BRIDGE},ip=${NET_IP},gw=${NET_GW}"
+    log_ok "Container IP set to static: $NET_IP"
+  fi
 }
 
 # ── Exec helper ──────────────────────────────────────────────────────────────
@@ -112,12 +126,14 @@ prompt_default() {
 # ── Flag parsing ─────────────────────────────────────────────────────────────
 OPT_YES=${OPT_YES:-0}
 OPT_FORCE=${OPT_FORCE:-0}
+OPT_USE_ENV=${OPT_USE_ENV:-0}
 
 parse_common_flags() {
   for _arg in "$@"; do
     case "$_arg" in
       --yes|-y)   OPT_YES=1 ;;
       --force)    OPT_FORCE=1 ;;
+      --use-env)  OPT_USE_ENV=1 ;;
       --help|-h)  show_help; exit 0 ;;
     esac
   done
