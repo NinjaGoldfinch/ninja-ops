@@ -48,12 +48,10 @@ ADMIN_USERNAME=$(_prompt "Admin username" "admin")
 printf '\033[0;36m[ninja]\033[0m Admin password [leave blank to auto-generate]: '; read -r -s _pw; printf '\n'
 ADMIN_PASSWORD="${_pw:-$(openssl rand -hex 12)}"
 
-printf '\033[0;36m[ninja]\033[0m Redis password [leave blank to auto-generate]: '; read -r -s _rp; printf '\n'
-REDIS_PASSWORD="${_rp:-$(openssl rand -hex 16)}"
-
-# ── Generate remaining secrets ────────────────────────────────────────────────
+# ── Generate secrets ──────────────────────────────────────────────────────────
 # Uses openssl rand -hex, the same output format as gen_hex in scripts/setup-env.sh
 PG_PASSWORD=$(openssl rand -hex 16)
+REDIS_PASSWORD=$(openssl rand -hex 16)
 JWT_SECRET=$(openssl rand -hex 64)
 ENCRYPTION_KEY=$(openssl rand -hex 32)
 AGENT_SECRET=$(openssl rand -hex 64)
