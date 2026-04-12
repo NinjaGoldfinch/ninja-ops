@@ -183,6 +183,14 @@ if [ "${OPT_YES:-0}" -eq 0 ]; then
     read -r _ue </dev/tty
     case "$_ue" in n|N|no|NO) OPT_USE_ENV=0 ;; *) OPT_USE_ENV=1 ;; esac
   fi
+
+  if [ "${OPT_USE_ENV:-0}" -eq 0 ]; then
+    printf '\n'
+    log_info "Secrets"
+    printf '\n'
+    prompt_default "PostgreSQL password" "$PG_PASSWORD" "leave as-is to use generated value"
+    PG_PASSWORD="$REPLY"
+  fi
   printf '\n'
 
   printf '\n'
@@ -234,10 +242,6 @@ if [ "${OPT_YES:-0}" -eq 0 ]; then
   PG_DB="$REPLY"
   prompt_default "User" "$PG_USER"
   PG_USER="$REPLY"
-  if [ "${OPT_USE_ENV:-0}" -eq 0 ]; then
-    prompt_default "Password" "$PG_PASSWORD" "leave as-is to use generated value"
-    PG_PASSWORD="$REPLY"
-  fi
   prompt_default "Allowed network" "$PG_ALLOWED_NETWORK" "10.0.0.0/24, 0.0.0.0/0"
   PG_ALLOWED_NETWORK="$REPLY"
   printf '\n'

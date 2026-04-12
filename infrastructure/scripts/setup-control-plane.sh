@@ -195,6 +195,16 @@ if [ "${OPT_YES:-0}" -eq 0 ]; then
     read -r _ue </dev/tty
     case "$_ue" in n|N|no|NO) OPT_USE_ENV=0 ;; *) OPT_USE_ENV=1 ;; esac
   fi
+
+  if [ "${OPT_USE_ENV:-0}" -eq 0 ]; then
+    printf '\n'
+    log_info "Admin account"
+    printf '\n'
+    prompt_default "Username" "${ADMIN_USERNAME:-admin}"
+    ADMIN_USERNAME="$REPLY"
+    prompt_default "Password" "${ADMIN_PASSWORD:-}" "leave as-is to use generated value"
+    ADMIN_PASSWORD="$REPLY"
+  fi
   printf '\n'
 
   printf '\n'
@@ -263,15 +273,6 @@ if [ "${OPT_YES:-0}" -eq 0 ]; then
   prompt_default "GitHub token" "${GITHUB_TOKEN:-}" "required for private repos, leave empty for public"
   GITHUB_TOKEN="$REPLY"
 
-  if [ "${OPT_USE_ENV:-0}" -eq 0 ]; then
-    printf '\n'
-    log_info "Admin account"
-    printf '\n'
-    prompt_default "Username" "${ADMIN_USERNAME:-admin}"
-    ADMIN_USERNAME="$REPLY"
-    prompt_default "Password" "${ADMIN_PASSWORD:-}" "leave as-is to use generated value"
-    ADMIN_PASSWORD="$REPLY"
-  fi
   printf '\n'
 fi
 

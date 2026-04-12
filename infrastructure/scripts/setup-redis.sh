@@ -172,6 +172,15 @@ if [ "${OPT_YES:-0}" -eq 0 ]; then
     read -r _ue </dev/tty
     case "$_ue" in n|N|no|NO) OPT_USE_ENV=0 ;; *) OPT_USE_ENV=1 ;; esac
   fi
+
+  if [ "${OPT_USE_ENV:-0}" -eq 0 ]; then
+    printf '\n'
+    log_info "Secrets"
+    printf '\n'
+    _redis_pw_display="${REDIS_PASSWORD:-(none)}"
+    prompt_default "Redis password" "$_redis_pw_display" "leave empty for no auth"
+    [ "$REPLY" = "(none)" ] && REDIS_PASSWORD="" || REDIS_PASSWORD="$REPLY"
+  fi
   printf '\n'
 
   printf '\n'
@@ -217,11 +226,6 @@ if [ "${OPT_YES:-0}" -eq 0 ]; then
   printf '\n'
   log_info "Redis"
   printf '\n'
-  if [ "${OPT_USE_ENV:-0}" -eq 0 ]; then
-    _redis_pw_display="${REDIS_PASSWORD:-(none)}"
-    prompt_default "Password" "$_redis_pw_display" "leave empty for no auth"
-    [ "$REPLY" = "(none)" ] && REDIS_PASSWORD="" || REDIS_PASSWORD="$REPLY"
-  fi
   prompt_default "Max memory" "$REDIS_MAXMEMORY" "128mb, 256mb, 512mb"
   REDIS_MAXMEMORY="$REPLY"
   prompt_default "Eviction policy" "$REDIS_MAXMEMORY_POLICY" "noeviction, allkeys-lru, volatile-lru"
