@@ -82,10 +82,10 @@ read -r -p "Press Enter once saved... "
 # ── Deploy ────────────────────────────────────────────────────────────────────
 set -a; source /tmp/ninja-deploy.env; set +a
 
-curl -sSL "${RAW}/infrastructure/scripts/setup-postgres.sh"      | bash -s -- --yes
-curl -sSL "${RAW}/infrastructure/scripts/setup-redis.sh"         | bash -s -- --yes
-curl -sSL "${RAW}/infrastructure/scripts/setup-control-plane.sh" | bash -s -- --yes
-curl -sSL "${RAW}/infrastructure/scripts/setup-dashboard.sh"     | bash -s -- --yes
+curl -sSL "${RAW}/infrastructure/scripts/setup-postgres.sh"      | bash
+curl -sSL "${RAW}/infrastructure/scripts/setup-redis.sh"         | bash
+curl -sSL "${RAW}/infrastructure/scripts/setup-control-plane.sh" | bash
+curl -sSL "${RAW}/infrastructure/scripts/setup-dashboard.sh"     | bash
 
 # ── Clean up ──────────────────────────────────────────────────────────────────
 rm /tmp/ninja-deploy.env
