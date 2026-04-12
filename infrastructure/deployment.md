@@ -81,13 +81,18 @@ read -r -p "Press Enter once saved... " </dev/tty
 # ── Deploy ────────────────────────────────────────────────────────────────────
 set -a; source /tmp/ninja-deploy.env; set +a
 
-bash <(curl -sSL "${RAW}/infrastructure/scripts/setup-postgres.sh")
-bash <(curl -sSL "${RAW}/infrastructure/scripts/setup-redis.sh")
-bash <(curl -sSL "${RAW}/infrastructure/scripts/setup-control-plane.sh")
-bash <(curl -sSL "${RAW}/infrastructure/scripts/setup-dashboard.sh")
+curl -sSL "${RAW}/infrastructure/scripts/setup-postgres.sh"      -o /tmp/_ninja_postgres.sh
+curl -sSL "${RAW}/infrastructure/scripts/setup-redis.sh"         -o /tmp/_ninja_redis.sh
+curl -sSL "${RAW}/infrastructure/scripts/setup-control-plane.sh" -o /tmp/_ninja_cp.sh
+curl -sSL "${RAW}/infrastructure/scripts/setup-dashboard.sh"     -o /tmp/_ninja_dash.sh
+
+bash /tmp/_ninja_postgres.sh
+bash /tmp/_ninja_redis.sh
+bash /tmp/_ninja_cp.sh
+bash /tmp/_ninja_dash.sh
 
 # ── Clean up ──────────────────────────────────────────────────────────────────
-rm /tmp/ninja-deploy.env
+rm /tmp/ninja-deploy.env /tmp/_ninja_postgres.sh /tmp/_ninja_redis.sh /tmp/_ninja_cp.sh /tmp/_ninja_dash.sh
 ```
 
 All secrets are generated before any container is created. The env file is deleted from the host after deployment completes.
