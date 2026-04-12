@@ -172,7 +172,7 @@ Environment variables (all optional):
   CT_SWAP            Swap in MB (default: 256)
   CT_CORES           CPU cores (default: 1)
   CT_TEMPLATE_STORAGE  Template storage (default: local)
-  CT_TEMPLATE_DISTRO   Distro pattern (default: debian-13.4-slim)
+  CT_TEMPLATE_DISTRO   Distro pattern (default: 13.4-slim)
   NET_BRIDGE         Network bridge (default: vmbr0)
   NET_IP             IP with CIDR (default: 10.0.0.21/24)
   NET_GW             Gateway (default: 10.0.0.1)
@@ -208,7 +208,7 @@ CT_MEMORY="${DASH_MEMORY:-512}"
 CT_SWAP="${DASH_SWAP:-256}"
 CT_CORES="${DASH_CORES:-1}"
 CT_TEMPLATE_STORAGE="${CT_TEMPLATE_STORAGE:-local}"
-CT_TEMPLATE_DISTRO="${DASH_TEMPLATE:-debian-13.4-slim}"
+CT_TEMPLATE_DISTRO="${DASH_TEMPLATE:-13.4-slim}"
 NET_BRIDGE="${DASH_NET_BRIDGE:-vmbr0}"
 NET_IP="${DASH_NET_IP:-10.0.0.21/24}"
 NET_GW="${DASH_NET_GW:-10.0.0.1}"
