@@ -41,11 +41,19 @@ Nothing needs to be installed on the Proxmox host — all scripts are fetched di
 ```bash
 RAW="https://raw.githubusercontent.com/NinjaGoldfinch/ninja-ops/main"
 
-# ── Generate secrets ──────────────────────────────────────────────────────────
+# ── Prompt for user-defined values ────────────────────────────────────────────
+_prompt() { printf '\033[0;36m[ninja]\033[0m %s [%s]: ' "$1" "$2"; read -r _v; printf '%s' "${_v:-$2}"; }
+
+ADMIN_USERNAME=$(_prompt "Admin username" "admin")
+printf '\033[0;36m[ninja]\033[0m Admin password [leave blank to auto-generate]: '; read -r -s _pw; printf '\n'
+ADMIN_PASSWORD="${_pw:-$(openssl rand -hex 12)}"
+
+printf '\033[0;36m[ninja]\033[0m Redis password [leave blank to auto-generate]: '; read -r -s _rp; printf '\n'
+REDIS_PASSWORD="${_rp:-$(openssl rand -hex 16)}"
+
+# ── Generate remaining secrets ────────────────────────────────────────────────
 # Uses openssl rand -hex, the same output format as gen_hex in scripts/setup-env.sh
 PG_PASSWORD=$(openssl rand -hex 16)
-REDIS_PASSWORD=$(openssl rand -hex 16)
-ADMIN_PASSWORD=$(openssl rand -hex 12)
 JWT_SECRET=$(openssl rand -hex 64)
 ENCRYPTION_KEY=$(openssl rand -hex 32)
 AGENT_SECRET=$(openssl rand -hex 64)
@@ -59,7 +67,7 @@ DATABASE_URL=postgres://ninja:${PG_PASSWORD}@10.0.0.10:5432/ninja_ops
 REDIS_PASSWORD=${REDIS_PASSWORD}
 REDIS_URL=redis://:${REDIS_PASSWORD}@10.0.0.11:6379
 
-ADMIN_USERNAME=admin
+ADMIN_USERNAME=${ADMIN_USERNAME}
 ADMIN_PASSWORD=${ADMIN_PASSWORD}
 
 JWT_SECRET=${JWT_SECRET}
