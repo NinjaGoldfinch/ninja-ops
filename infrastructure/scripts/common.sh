@@ -39,8 +39,8 @@ check_proxmox_host() {
 }
 
 # ── Template helpers ─────────────────────────────────────────────────────────
-find_latest_template() {  # $1 = distro pattern (e.g. "debian-12")
-  pveam available --section system | grep "$1" | sort -V | tail -1 | awk '{print $2}'
+find_latest_template() {  # $1 = distro pattern (e.g. "debian-13-slim")
+  pveam available --section system | grep "$1" | sort -V | tail -1 | awk '{print $2}' || true
 }
 
 download_template() {  # $1 = storage, $2 = template name
