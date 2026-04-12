@@ -324,9 +324,15 @@ CLONE_URL="$REPO_URL"
 if [ -n "$GITHUB_TOKEN" ]; then
   CLONE_URL="${REPO_URL/https:\/\//https://${GITHUB_TOKEN}@}"
 fi
-exec_ct "$CT_ID" "git clone --branch ${REPO_BRANCH} ${CLONE_URL} ${INSTALL_DIR} && \
+exec_ct "$CT_ID" "
+  if [ -d '${INSTALL_DIR}/.git' ]; then
+    git -C '${INSTALL_DIR}' fetch origin && git -C '${INSTALL_DIR}' reset --hard origin/${REPO_BRANCH}
+  else
+    rm -rf '${INSTALL_DIR}'
+    git clone --branch ${REPO_BRANCH} ${CLONE_URL} ${INSTALL_DIR}
+  fi
   chown -R ${SERVICE_USER}:${SERVICE_USER} ${INSTALL_DIR}"
-log_ok "Repository cloned to $INSTALL_DIR"
+log_ok "Repository ready at $INSTALL_DIR"
 
 # ── Install deps and build ───────────────────────────────────────────────────
 log_info "Installing dependencies (this may take a few minutes)..."
