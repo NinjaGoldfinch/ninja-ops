@@ -153,128 +153,38 @@ for _arg in "$@"; do
   case "$_arg" in
     --yes|-y)    OPT_YES=1 ;;
     --force)     OPT_FORCE=1 ;;
-    --use-env)   OPT_USE_ENV=1 ;;
     --help|-h)   show_help; exit 0 ;;
     *) die "Unknown option: $_arg (use --help)" ;;
   esac
 done
 
 # ── Defaults ─────────────────────────────────────────────────────────────────
-CT_ID="${CT_ID:-102}"
-CT_HOSTNAME="${CT_HOSTNAME:-control-plane-01}"
-CT_STORAGE="${CT_STORAGE:-local-lvm}"
-CT_DISK="${CT_DISK:-8}"
-CT_MEMORY="${CT_MEMORY:-2048}"
-CT_SWAP="${CT_SWAP:-512}"
-CT_CORES="${CT_CORES:-2}"
+CT_ID="${CP_CT_ID:-102}"
+CT_HOSTNAME="${CP_HOSTNAME:-control-plane-01}"
+CT_STORAGE="${CP_STORAGE:-local-lvm}"
+CT_DISK="${CP_DISK:-8}"
+CT_MEMORY="${CP_MEMORY:-2048}"
+CT_SWAP="${CP_SWAP:-512}"
+CT_CORES="${CP_CORES:-2}"
 CT_TEMPLATE_STORAGE="${CT_TEMPLATE_STORAGE:-local}"
-CT_TEMPLATE_DISTRO="${CT_TEMPLATE_DISTRO:-debian-13-slim}"
-NET_BRIDGE="${NET_BRIDGE:-vmbr0}"
-NET_IP="${NET_IP:-10.0.0.20/24}"
-NET_GW="${NET_GW:-10.0.0.1}"
-NET_DNS="${NET_DNS:-1.1.1.1}"
+CT_TEMPLATE_DISTRO="${CP_TEMPLATE:-debian-13-slim}"
+NET_BRIDGE="${CP_NET_BRIDGE:-vmbr0}"
+NET_IP="${CP_NET_IP:-10.0.0.20/24}"
+NET_GW="${CP_NET_GW:-10.0.0.1}"
+NET_DNS="${CP_NET_DNS:-1.1.1.1}"
 NODE_VERSION="${NODE_VERSION:-22}"
 REPO_URL="${REPO_URL:-https://github.com/NinjaGoldfinch/ninja-ops.git}"
-REPO_BRANCH="${REPO_BRANCH:-main}"
-GITHUB_TOKEN="${GITHUB_TOKEN:-}"
+REPO_BRANCH="${CP_REPO_BRANCH:-${REPO_BRANCH:-main}}"
+GITHUB_TOKEN="${CP_GITHUB_TOKEN:-${GITHUB_TOKEN:-}}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/ninja-ops}"
 SERVICE_USER="${SERVICE_USER:-ninja}"
-TZ="${TZ:-Pacific/Auckland}"
+TZ="${CP_TZ:-${TZ:-Pacific/Auckland}}"
 RUN_SEED="${RUN_SEED:-true}"
 CP_PORT="${CP_PORT:-3000}"
-
-# Required
 DATABASE_URL="${DATABASE_URL:-}"
 REDIS_URL="${REDIS_URL:-}"
-OPT_USE_ENV="${OPT_USE_ENV:-0}"
-
-# ── Interactive configuration ────────────────────────────────────────────────
-if [ "${OPT_YES:-0}" -eq 0 ]; then
-  if [ "${OPT_USE_ENV:-0}" -eq 0 ]; then
-    printf '%s[ninja]%s Use pre-generated secrets from environment? [Y/n]: ' "$C_CYN" "$C_RST" >/dev/tty
-    read -r _ue </dev/tty
-    case "$_ue" in n|N|no|NO) OPT_USE_ENV=0 ;; *) OPT_USE_ENV=1 ;; esac
-  fi
-
-  if [ "${OPT_USE_ENV:-0}" -eq 0 ]; then
-    printf '\n'
-    log_info "Admin account"
-    printf '\n'
-    prompt_default "Username" "${ADMIN_USERNAME:-admin}"
-    ADMIN_USERNAME="$REPLY"
-    prompt_default "Password" "${ADMIN_PASSWORD:-}" "leave as-is to use generated value"
-    ADMIN_PASSWORD="$REPLY"
-  fi
-  printf '\n'
-
-  printf '\n'
-  log_info "Container  (press Enter to accept defaults)"
-  printf '\n'
-  prompt_default "VMID" "$CT_ID" "any unused Proxmox container ID"
-  CT_ID="$REPLY"
-  prompt_default "Hostname" "$CT_HOSTNAME"
-  CT_HOSTNAME="$REPLY"
-  prompt_default "Storage" "$CT_STORAGE" "local-lvm, local, zfspool"
-  CT_STORAGE="$REPLY"
-  prompt_default "Template" "$CT_TEMPLATE_DISTRO" "debian-13-slim, debian-13, debian-12, ubuntu-24.04"
-  CT_TEMPLATE_DISTRO="$REPLY"
-  prompt_default "Timezone" "$TZ" "UTC, Europe/London, America/New_York, Australia/Sydney"
-  TZ="$REPLY"
-
-  printf '\n'
-  log_info "Network"
-  printf '\n'
-  prompt_default "IP/CIDR" "$NET_IP" "10.0.0.x/24 or dhcp"
-  NET_IP="$REPLY"
-  if [ "$NET_IP" != "dhcp" ]; then
-    prompt_default "Gateway" "$NET_GW"
-    NET_GW="$REPLY"
-  fi
-  prompt_default "DNS" "$NET_DNS" "1.1.1.1, 8.8.8.8"
-  NET_DNS="$REPLY"
-  prompt_default "Bridge" "$NET_BRIDGE" "vmbr0, vmbr1"
-  NET_BRIDGE="$REPLY"
-
-  printf '\n'
-  log_info "Resources"
-  printf '\n'
-  prompt_default "Disk (GB)" "$CT_DISK" "minimum 4"
-  CT_DISK="$REPLY"
-  prompt_default "Memory (MB)" "$CT_MEMORY" "1024, 2048, 4096"
-  CT_MEMORY="$REPLY"
-  prompt_default "Swap (MB)" "$CT_SWAP"
-  CT_SWAP="$REPLY"
-  prompt_default "Cores" "$CT_CORES" "1, 2, 4"
-  CT_CORES="$REPLY"
-
-  printf '\n'
-  log_info "Connections"
-  printf '\n'
-  while true; do
-    prompt_default "DATABASE_URL" "${DATABASE_URL:-}" "postgres://ninja:pw@10.0.0.10:5432/ninja_ops"
-    DATABASE_URL="$REPLY"
-    case "$DATABASE_URL" in postgres://?*) break ;; esac
-    log_warn "Must start with postgres://"
-  done
-  while true; do
-    prompt_default "REDIS_URL" "${REDIS_URL:-}" "redis://10.0.0.11:6379, redis://:pass@host:6379"
-    REDIS_URL="$REPLY"
-    case "$REDIS_URL" in redis://*) break ;; esac
-    log_warn "Must start with redis://"
-  done
-
-  printf '\n'
-  log_info "Service"
-  printf '\n'
-  prompt_default "API port" "$CP_PORT" "3000, 8080"
-  CP_PORT="$REPLY"
-  prompt_default "Repo branch" "$REPO_BRANCH" "main, develop"
-  REPO_BRANCH="$REPLY"
-  prompt_default "GitHub token" "${GITHUB_TOKEN:-}" "required for private repos, leave empty for public"
-  GITHUB_TOKEN="$REPLY"
-
-  printf '\n'
-fi
+ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
+ADMIN_PASSWORD="${ADMIN_PASSWORD:-$(gen_secret 12)}"
 
 [ -z "$DATABASE_URL" ] && die "DATABASE_URL is required (e.g. postgres://ninja:pw@10.0.0.10:5432/ninja_ops)"
 [ -z "$REDIS_URL" ]    && die "REDIS_URL is required (e.g. redis://10.0.0.11:6379)"

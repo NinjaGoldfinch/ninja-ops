@@ -139,99 +139,29 @@ for _arg in "$@"; do
   case "$_arg" in
     --yes|-y)    OPT_YES=1 ;;
     --force)     OPT_FORCE=1 ;;
-    --use-env)   OPT_USE_ENV=1 ;;
     --help|-h)   show_help; exit 0 ;;
     *) die "Unknown option: $_arg (use --help)" ;;
   esac
 done
 
 # ── Defaults ─────────────────────────────────────────────────────────────────
-CT_ID="${CT_ID:-101}"
-CT_HOSTNAME="${CT_HOSTNAME:-redis-01}"
-CT_STORAGE="${CT_STORAGE:-local-lvm}"
-CT_DISK="${CT_DISK:-4}"
-CT_MEMORY="${CT_MEMORY:-512}"
-CT_SWAP="${CT_SWAP:-256}"
-CT_CORES="${CT_CORES:-1}"
+CT_ID="${REDIS_CT_ID:-101}"
+CT_HOSTNAME="${REDIS_HOSTNAME:-redis-01}"
+CT_STORAGE="${REDIS_STORAGE:-local-lvm}"
+CT_DISK="${REDIS_DISK:-4}"
+CT_MEMORY="${REDIS_MEMORY:-512}"
+CT_SWAP="${REDIS_SWAP:-256}"
+CT_CORES="${REDIS_CORES:-1}"
 CT_TEMPLATE_STORAGE="${CT_TEMPLATE_STORAGE:-local}"
-CT_TEMPLATE_DISTRO="${CT_TEMPLATE_DISTRO:-debian-13-slim}"
-NET_BRIDGE="${NET_BRIDGE:-vmbr0}"
-NET_IP="${NET_IP:-10.0.0.11/24}"
-NET_GW="${NET_GW:-10.0.0.1}"
-NET_DNS="${NET_DNS:-1.1.1.1}"
+CT_TEMPLATE_DISTRO="${REDIS_TEMPLATE:-debian-13-slim}"
+NET_BRIDGE="${REDIS_NET_BRIDGE:-vmbr0}"
+NET_IP="${REDIS_NET_IP:-10.0.0.11/24}"
+NET_GW="${REDIS_NET_GW:-10.0.0.1}"
+NET_DNS="${REDIS_NET_DNS:-1.1.1.1}"
 REDIS_PASSWORD="${REDIS_PASSWORD:-}"
 REDIS_MAXMEMORY="${REDIS_MAXMEMORY:-256mb}"
 REDIS_MAXMEMORY_POLICY="${REDIS_MAXMEMORY_POLICY:-noeviction}"
-TZ="${TZ:-Pacific/Auckland}"
-OPT_USE_ENV="${OPT_USE_ENV:-0}"
-
-# ── Interactive configuration ────────────────────────────────────────────────
-if [ "${OPT_YES:-0}" -eq 0 ]; then
-  if [ "${OPT_USE_ENV:-0}" -eq 0 ]; then
-    printf '%s[ninja]%s Use pre-generated secrets from environment? [Y/n]: ' "$C_CYN" "$C_RST" >/dev/tty
-    read -r _ue </dev/tty
-    case "$_ue" in n|N|no|NO) OPT_USE_ENV=0 ;; *) OPT_USE_ENV=1 ;; esac
-  fi
-
-  if [ "${OPT_USE_ENV:-0}" -eq 0 ]; then
-    printf '\n'
-    log_info "Secrets"
-    printf '\n'
-    _redis_pw_display="${REDIS_PASSWORD:-(none)}"
-    prompt_default "Redis password" "$_redis_pw_display" "leave empty for no auth"
-    [ "$REPLY" = "(none)" ] && REDIS_PASSWORD="" || REDIS_PASSWORD="$REPLY"
-  fi
-  printf '\n'
-
-  printf '\n'
-  log_info "Container  (press Enter to accept defaults)"
-  printf '\n'
-  prompt_default "VMID" "$CT_ID" "any unused Proxmox container ID"
-  CT_ID="$REPLY"
-  prompt_default "Hostname" "$CT_HOSTNAME"
-  CT_HOSTNAME="$REPLY"
-  prompt_default "Storage" "$CT_STORAGE" "local-lvm, local, zfspool"
-  CT_STORAGE="$REPLY"
-  prompt_default "Template" "$CT_TEMPLATE_DISTRO" "debian-13-slim, debian-13, debian-12, ubuntu-24.04"
-  CT_TEMPLATE_DISTRO="$REPLY"
-  prompt_default "Timezone" "$TZ" "UTC, Europe/London, America/New_York, Australia/Sydney"
-  TZ="$REPLY"
-
-  printf '\n'
-  log_info "Network"
-  printf '\n'
-  prompt_default "IP/CIDR" "$NET_IP" "10.0.0.x/24 or dhcp"
-  NET_IP="$REPLY"
-  if [ "$NET_IP" != "dhcp" ]; then
-    prompt_default "Gateway" "$NET_GW"
-    NET_GW="$REPLY"
-  fi
-  prompt_default "DNS" "$NET_DNS" "1.1.1.1, 8.8.8.8"
-  NET_DNS="$REPLY"
-  prompt_default "Bridge" "$NET_BRIDGE" "vmbr0, vmbr1"
-  NET_BRIDGE="$REPLY"
-
-  printf '\n'
-  log_info "Resources"
-  printf '\n'
-  prompt_default "Disk (GB)" "$CT_DISK" "minimum 2"
-  CT_DISK="$REPLY"
-  prompt_default "Memory (MB)" "$CT_MEMORY" "256, 512, 1024"
-  CT_MEMORY="$REPLY"
-  prompt_default "Swap (MB)" "$CT_SWAP"
-  CT_SWAP="$REPLY"
-  prompt_default "Cores" "$CT_CORES" "1, 2"
-  CT_CORES="$REPLY"
-
-  printf '\n'
-  log_info "Redis"
-  printf '\n'
-  prompt_default "Max memory" "$REDIS_MAXMEMORY" "128mb, 256mb, 512mb"
-  REDIS_MAXMEMORY="$REPLY"
-  prompt_default "Eviction policy" "$REDIS_MAXMEMORY_POLICY" "noeviction, allkeys-lru, volatile-lru"
-  REDIS_MAXMEMORY_POLICY="$REPLY"
-  printf '\n'
-fi
+TZ="${REDIS_TZ:-${TZ:-Pacific/Auckland}}"
 
 # ── Preflight ────────────────────────────────────────────────────────────────
 check_proxmox_host

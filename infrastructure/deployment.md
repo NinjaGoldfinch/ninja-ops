@@ -22,7 +22,7 @@ All IPs, ports, and hostnames are configurable via environment variables.
 
 ## Resource Defaults
 
-These are the default values used when no overrides are set. All can be changed — see [Script Reference](#script-reference).
+These are the default values used when no overrides are set. All can be changed via `setup-env.sh` or by editing `ninja-ops.env` before sourcing it.
 
 | Container | `CT_DISK` | `CT_MEMORY` | `CT_SWAP` | `CT_CORES` |
 |---|---|---|---|---|
@@ -36,68 +36,62 @@ These are the default values used when no overrides are set. All can be changed 
 
 ## Quick Start
 
-Nothing needs to be installed on the Proxmox host — all scripts are fetched directly from GitHub. Run this on the PVE host in order.
+Nothing needs to be installed on the Proxmox host — all scripts are fetched directly from GitHub. Run everything on the PVE host as root.
+
+### 1. Configure
+
+Download and run the configuration wizard. It walks through settings for all four containers and writes them to `ninja-ops.env`.
 
 ```bash
 RAW="https://raw.githubusercontent.com/NinjaGoldfinch/ninja-ops/main"
-
-# ── Prompt for user-defined values ────────────────────────────────────────────
-printf '\033[0;36m[ninja]\033[0m Admin username [admin]: ' >/dev/tty; read -r ADMIN_USERNAME </dev/tty
-ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
-printf '\033[0;36m[ninja]\033[0m Admin password [leave blank to auto-generate]: ' >/dev/tty; read -r -s ADMIN_PASSWORD </dev/tty; printf '\n' >/dev/tty
-ADMIN_PASSWORD="${ADMIN_PASSWORD:-$(openssl rand -hex 12)}"
-
-# ── Generate secrets ──────────────────────────────────────────────────────────
-# Uses openssl rand -hex, the same output format as gen_hex in scripts/setup-env.sh
-PG_PASSWORD=$(openssl rand -hex 16)
-REDIS_PASSWORD=$(openssl rand -hex 16)
-JWT_SECRET=$(openssl rand -hex 64)
-ENCRYPTION_KEY=$(openssl rand -hex 32)
-AGENT_SECRET=$(openssl rand -hex 64)
-GITHUB_WEBHOOK_SECRET=$(openssl rand -hex 32)
-
-# ── Write deploy config ───────────────────────────────────────────────────────
-cat > /tmp/ninja-deploy.env <<EOF
-PG_PASSWORD=${PG_PASSWORD}
-DATABASE_URL=postgres://ninja:${PG_PASSWORD}@10.0.0.10:5432/ninja_ops
-
-REDIS_PASSWORD=${REDIS_PASSWORD}
-REDIS_URL=redis://:${REDIS_PASSWORD}@10.0.0.11:6379
-
-ADMIN_USERNAME=${ADMIN_USERNAME}
-ADMIN_PASSWORD=${ADMIN_PASSWORD}
-
-JWT_SECRET=${JWT_SECRET}
-ENCRYPTION_KEY=${ENCRYPTION_KEY}
-AGENT_SECRET=${AGENT_SECRET}
-GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
-EOF
-
-printf '\n\033[0;33m── Save these to your password manager ──\033[0m\n\n'
-cat /tmp/ninja-deploy.env
-printf '\n\033[0;33m─────────────────────────────────────────\033[0m\n\n'
-read -r -p "Press Enter once saved... " </dev/tty
-
-# ── Deploy ────────────────────────────────────────────────────────────────────
-set -a; source /tmp/ninja-deploy.env; set +a
-
-curl -sSL "${RAW}/infrastructure/scripts/setup-postgres.sh"      -o /tmp/_ninja_postgres.sh
-curl -sSL "${RAW}/infrastructure/scripts/setup-redis.sh"         -o /tmp/_ninja_redis.sh
-curl -sSL "${RAW}/infrastructure/scripts/setup-control-plane.sh" -o /tmp/_ninja_cp.sh
-curl -sSL "${RAW}/infrastructure/scripts/setup-dashboard.sh"     -o /tmp/_ninja_dash.sh
-
-bash /tmp/_ninja_postgres.sh
-bash /tmp/_ninja_redis.sh
-bash /tmp/_ninja_cp.sh
-bash /tmp/_ninja_dash.sh
-
-# ── Clean up ──────────────────────────────────────────────────────────────────
-rm /tmp/ninja-deploy.env /tmp/_ninja_postgres.sh /tmp/_ninja_redis.sh /tmp/_ninja_cp.sh /tmp/_ninja_dash.sh
+curl -sSL "${RAW}/infrastructure/scripts/setup-env.sh" -o setup-env.sh
+bash setup-env.sh
 ```
 
-All secrets are generated before any container is created. The env file is deleted from the host after deployment completes.
+Review the generated `ninja-ops.env`, save the secrets to a password manager, then source it:
 
-To override any default (IP, port, resources, etc.) add the variable to the env file before the `set -a` line — see [Script Reference](#script-reference).
+```bash
+set -a; source ninja-ops.env; set +a
+```
+
+### 2. PostgreSQL
+
+```bash
+curl -sSL "${RAW}/infrastructure/scripts/setup-postgres.sh" -o setup-postgres.sh
+bash setup-postgres.sh
+```
+
+### 3. Redis
+
+```bash
+curl -sSL "${RAW}/infrastructure/scripts/setup-redis.sh" -o setup-redis.sh
+bash setup-redis.sh
+```
+
+### 4. Control Plane
+
+```bash
+curl -sSL "${RAW}/infrastructure/scripts/setup-control-plane.sh" -o setup-control-plane.sh
+bash setup-control-plane.sh
+```
+
+### 5. Dashboard
+
+```bash
+curl -sSL "${RAW}/infrastructure/scripts/setup-dashboard.sh" -o setup-dashboard.sh
+bash setup-dashboard.sh
+```
+
+---
+
+Each script shows a confirmation summary before provisioning. Pass `--yes` to skip it, `--force` to destroy and recreate an existing container.
+
+To re-run a single step later, just re-source the env file and run that script:
+
+```bash
+set -a; source ninja-ops.env; set +a
+bash setup-control-plane.sh --force
+```
 
 ---
 
@@ -186,7 +180,7 @@ All scripts accept `--yes` (skip prompt), `--force` (destroy and recreate), and 
 | `CT_SWAP` | `256` | Swap (MB) |
 | `CT_CORES` | `1` | CPU cores |
 | `NET_IP` | `10.0.0.21/24` | Container IP/CIDR |
-| `CT_CP_ID` | `202` | Control plane CT to build on |
+| `CT_CP_ID` | `102` | Control plane CT to build on |
 | `CP_INSTALL_DIR` | `/opt/ninja-ops` | Repo path on the control plane CT |
 | `VITE_API_URL` | `http://10.0.0.20:3000` | Control plane URL baked into the bundle |
 | `DASH_DIR` | `/opt/dashboard` | Directory to serve from |
@@ -201,7 +195,7 @@ All scripts accept `--yes` (skip prompt), `--force` (destroy and recreate), and 
 ### Control Plane
 
 ```bash
-pct exec 202 -- bash -c "
+pct exec 102 -- bash -c "
   cd /opt/ninja-ops && \
   sudo -u ninja git pull && \
   sudo -u ninja pnpm install --frozen-lockfile && \
@@ -217,11 +211,11 @@ pct exec 202 -- bash -c "
 
 ### Dashboard
 
-Build on CT 202, transfer to CT 203 — the control plane never restarts.
+Build on CT 102, transfer to CT 103 — the control plane never restarts.
 
 ```bash
 # Build on the control plane
-pct exec 202 -- bash -c "
+pct exec 102 -- bash -c "
   cd /opt/ninja-ops && \
   sudo -u ninja git pull && \
   sudo -u ninja pnpm install --frozen-lockfile && \
@@ -231,11 +225,11 @@ pct exec 202 -- bash -c "
 "
 
 # Transfer and deploy
-pct pull 202 /tmp/ninja-dashboard.tar.gz /tmp/ninja-dashboard.tar.gz
-pct exec 202 -- rm /tmp/ninja-dashboard.tar.gz
-pct push 203 /tmp/ninja-dashboard.tar.gz /tmp/ninja-dashboard.tar.gz
+pct pull 102 /tmp/ninja-dashboard.tar.gz /tmp/ninja-dashboard.tar.gz
+pct exec 102 -- rm /tmp/ninja-dashboard.tar.gz
+pct push 103 /tmp/ninja-dashboard.tar.gz /tmp/ninja-dashboard.tar.gz
 rm /tmp/ninja-dashboard.tar.gz
-pct exec 203 -- bash -c "
+pct exec 103 -- bash -c "
   tar -xzf /tmp/ninja-dashboard.tar.gz -C /opt/dashboard && \
   chown -R ninja:ninja /opt/dashboard && \
   rm /tmp/ninja-dashboard.tar.gz && \
@@ -249,21 +243,21 @@ pct exec 203 -- bash -c "
 
 ```bash
 # Service logs
-pct exec 202 -- journalctl -u ninja-control-plane -f
-pct exec 203 -- journalctl -u ninja-dashboard -f
-pct exec 200 -- journalctl -u postgresql -f
-pct exec 201 -- journalctl -u redis-server -f
+pct exec 102 -- journalctl -u ninja-control-plane -f
+pct exec 103 -- journalctl -u ninja-dashboard -f
+pct exec 100 -- journalctl -u postgresql -f
+pct exec 101 -- journalctl -u redis-server -f
 
 # Open a shell
-pct exec 202 -- bash
+pct exec 102 -- bash
 
 # Test database from control plane
-pct exec 202 -- bash -c "
+pct exec 102 -- bash -c "
   psql \$(grep DATABASE_URL /etc/ninja-ops/control-plane.env | cut -d= -f2-) -c 'SELECT 1'
 "
 
 # Test Redis from control plane
-pct exec 202 -- redis-cli -h 10.0.0.11 ping
+pct exec 102 -- redis-cli -h 10.0.0.11 ping
 
 # Health checks from host
 curl http://10.0.0.20:3000/healthz
