@@ -39,17 +39,104 @@ check_proxmox_host() {
 }
 
 # ── Template helpers ─────────────────────────────────────────────────────────
-find_latest_template() {  # $1 = distro pattern (e.g. "debian-13-slim")
-  local _t
-  # Try OCI registry first (Proxmox 8.2+)
-  _t=$(pveam available --section oci 2>/dev/null | grep "$1" | sort -V | tail -1 | awk '{print $2}' || true)
-  [ -n "$_t" ] && { printf '%s' "$_t"; return; }
-  # Fall back to standard system templates
-  pveam available --section system 2>/dev/null | grep "$1" | sort -V | tail -1 | awk '{print $2}' || true
+# list_downloaded_templates: prints bare template filenames from local storage
+# $1 = storage (e.g. "local")
+list_downloaded_templates() {
+  pveam list "$1" 2>/dev/null | awk 'NR>1 {n=$1; sub(/.*vztmpl\//,"",n); print n}' || true
 }
 
-download_template() {  # $1 = storage, $2 = template name
-  pveam list "$1" | grep -q "$2" || pveam download "$1" "$2"
+# list_available_templates: prints template names from OCI registry then system
+list_available_templates() {
+  { pveam available --section oci 2>/dev/null; pveam available --section system 2>/dev/null; } \
+    | awk '{print $2}' | sort -u || true
+}
+
+# prepare_template: interactive picker from downloaded templates; falls back to
+# listing available ones to download. Sets TEMPLATE variable.
+# Usage: prepare_template "$CT_TEMPLATE_DISTRO" "$CT_TEMPLATE_STORAGE"
+prepare_template() {
+  local _pattern="${1:-}" _storage="${2:-local}"
+  local _downloaded _count _default _i _t _sel
+
+  log_info "Listing downloaded templates in '$_storage'..."
+  _downloaded=$(list_downloaded_templates "$_storage")
+  _count=$(printf '%s\n' "$_downloaded" | grep -c . || true)
+
+  if [ -n "$_downloaded" ] && [ "$_count" -gt 0 ]; then
+    # ── Pick from already-downloaded templates ─────────────────────────────
+    _default=1
+    if [ "${OPT_YES:-0}" -eq 1 ]; then
+      # Auto-select: best match for pattern, else first
+      TEMPLATE=$(printf '%s\n' "$_downloaded" | grep "${_pattern:-}" | sort -V | tail -1 || true)
+      if [ -z "$TEMPLATE" ]; then
+        TEMPLATE=$(printf '%s\n' "$_downloaded" | head -1)
+        log_warn "No downloaded template matching '${_pattern}', using: $TEMPLATE"
+      else
+        log_ok "Auto-selected: $TEMPLATE"
+      fi
+      return
+    fi
+
+    printf '\n%sDownloaded templates in %s:%s\n' "$C_BLD" "$_storage" "$C_RST"
+    _i=1
+    while IFS= read -r _t; do
+      if [ -n "$_pattern" ] && printf '%s' "$_t" | grep -q "$_pattern"; then
+        printf '  [%d] %s %s(suggested)%s\n' "$_i" "$_t" "$C_GRN" "$C_RST"
+        _default=$_i
+      else
+        printf '  [%d] %s\n' "$_i" "$_t"
+      fi
+      _i=$((_i + 1))
+    done <<< "$_downloaded"
+    printf '\n'
+
+    prompt_default "Select template number" "$_default"
+    _sel="$REPLY"
+    TEMPLATE=$(printf '%s\n' "$_downloaded" | sed -n "${_sel}p")
+    [ -n "$TEMPLATE" ] || die "Invalid selection: $_sel"
+    log_ok "Selected: $TEMPLATE"
+
+  else
+    # ── No downloads yet — show available and offer to download ───────────
+    log_warn "No templates downloaded to '$_storage' — fetching available list..."
+    pveam update >/dev/null 2>&1 || true
+    local _avail
+    _avail=$(list_available_templates)
+
+    if [ -z "$_avail" ]; then
+      die "No templates available and none downloaded — check network / Proxmox subscription"
+    fi
+
+    if [ "${OPT_YES:-0}" -eq 1 ]; then
+      TEMPLATE=$(printf '%s\n' "$_avail" | grep "${_pattern:-}" | sort -V | tail -1 || true)
+      [ -n "$TEMPLATE" ] || die "No available template matching '${_pattern}'"
+      log_info "Downloading $TEMPLATE..."
+      pveam download "$_storage" "$TEMPLATE"
+      log_ok "Downloaded: $TEMPLATE"
+      return
+    fi
+
+    printf '\n%sAvailable templates (not yet downloaded):%s\n' "$C_BLD" "$C_RST"
+    _i=1; _default=1
+    while IFS= read -r _t; do
+      if [ -n "$_pattern" ] && printf '%s' "$_t" | grep -q "$_pattern"; then
+        printf '  [%d] %s %s(suggested)%s\n' "$_i" "$_t" "$C_GRN" "$C_RST"
+        _default=$_i
+      else
+        printf '  [%d] %s\n' "$_i" "$_t"
+      fi
+      _i=$((_i + 1))
+    done <<< "$_avail"
+    printf '\n'
+
+    prompt_default "Select template to download" "$_default"
+    _sel="$REPLY"
+    TEMPLATE=$(printf '%s\n' "$_avail" | sed -n "${_sel}p")
+    [ -n "$TEMPLATE" ] || die "Invalid selection: $_sel"
+    log_info "Downloading $TEMPLATE..."
+    pveam download "$_storage" "$TEMPLATE"
+    log_ok "Downloaded: $TEMPLATE"
+  fi
 }
 
 # ── LXC creation ─────────────────────────────────────────────────────────────

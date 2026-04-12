@@ -33,8 +33,49 @@ if [ "${_NINJA_COMMON_LOADED:-}" != "1" ]; then
     command -v pct  >/dev/null 2>&1 || die "pct not found — run this on a Proxmox VE host"
     command -v pvesh >/dev/null 2>&1 || die "pvesh not found — run this on a Proxmox VE host"
   }
-  find_latest_template() { local _t; _t=$(pveam available --section oci 2>/dev/null | grep "$1" | sort -V | tail -1 | awk '{print $2}' || true); [ -n "$_t" ] && { printf '%s' "$_t"; return; }; pveam available --section system 2>/dev/null | grep "$1" | sort -V | tail -1 | awk '{print $2}' || true; }
-  download_template() { pveam list "$1" | grep -q "$2" || pveam download "$1" "$2"; }
+  list_downloaded_templates() { pveam list "$1" 2>/dev/null | awk 'NR>1 {n=$1; sub(/.*vztmpl\//,"",n); print n}' || true; }
+  list_available_templates() { { pveam available --section oci 2>/dev/null; pveam available --section system 2>/dev/null; } | awk '{print $2}' | sort -u || true; }
+  prepare_template() {
+    local _p="${1:-}" _s="${2:-local}" _d _c _def _i _t _sel _avail
+    log_info "Listing downloaded templates in '$_s'..."
+    _d=$(list_downloaded_templates "$_s"); _c=$(printf '%s\n' "$_d" | grep -c . || true)
+    if [ -n "$_d" ] && [ "$_c" -gt 0 ]; then
+      if [ "${OPT_YES:-0}" -eq 1 ]; then
+        TEMPLATE=$(printf '%s\n' "$_d" | grep "${_p}" | sort -V | tail -1 || true)
+        if [ -z "$TEMPLATE" ]; then TEMPLATE=$(printf '%s\n' "$_d" | head -1); log_warn "No match for '${_p}', using: $TEMPLATE"
+        else log_ok "Auto-selected: $TEMPLATE"; fi; return
+      fi
+      printf '\n%sDownloaded templates in %s:%s\n' "$C_BLD" "$_s" "$C_RST"; _def=1; _i=1
+      while IFS= read -r _t; do
+        if [ -n "$_p" ] && printf '%s' "$_t" | grep -q "$_p"; then
+          printf '  [%d] %s %s(suggested)%s\n' "$_i" "$_t" "$C_GRN" "$C_RST"; _def=$_i
+        else printf '  [%d] %s\n' "$_i" "$_t"; fi
+        _i=$((_i+1))
+      done <<< "$_d"; printf '\n'
+      prompt_default "Select template number" "$_def"; _sel="$REPLY"
+      TEMPLATE=$(printf '%s\n' "$_d" | sed -n "${_sel}p"); [ -n "$TEMPLATE" ] || die "Invalid selection: $_sel"
+      log_ok "Selected: $TEMPLATE"
+    else
+      log_warn "No templates downloaded to '$_s' — fetching available list..."
+      pveam update >/dev/null 2>&1 || true
+      _avail=$(list_available_templates); [ -n "$_avail" ] || die "No templates available and none downloaded"
+      if [ "${OPT_YES:-0}" -eq 1 ]; then
+        TEMPLATE=$(printf '%s\n' "$_avail" | grep "${_p}" | sort -V | tail -1 || true)
+        [ -n "$TEMPLATE" ] || die "No available template matching '${_p}'"
+        log_info "Downloading $TEMPLATE..."; pveam download "$_s" "$TEMPLATE"; log_ok "Downloaded: $TEMPLATE"; return
+      fi
+      printf '\n%sAvailable templates (not yet downloaded):%s\n' "$C_BLD" "$C_RST"; _def=1; _i=1
+      while IFS= read -r _t; do
+        if [ -n "$_p" ] && printf '%s' "$_t" | grep -q "$_p"; then
+          printf '  [%d] %s %s(suggested)%s\n' "$_i" "$_t" "$C_GRN" "$C_RST"; _def=$_i
+        else printf '  [%d] %s\n' "$_i" "$_t"; fi
+        _i=$((_i+1))
+      done <<< "$_avail"; printf '\n'
+      prompt_default "Select template to download" "$_def"; _sel="$REPLY"
+      TEMPLATE=$(printf '%s\n' "$_avail" | sed -n "${_sel}p"); [ -n "$TEMPLATE" ] || die "Invalid selection: $_sel"
+      log_info "Downloading $TEMPLATE..."; pveam download "$_s" "$TEMPLATE"; log_ok "Downloaded: $TEMPLATE"
+    fi
+  }
   create_lxc() {
     if pct status "$CT_ID" >/dev/null 2>&1; then
       log_warn "CT $CT_ID already exists — skipping create"
@@ -167,7 +208,7 @@ CT_MEMORY="${CP_MEMORY:-2048}"
 CT_SWAP="${CP_SWAP:-512}"
 CT_CORES="${CP_CORES:-2}"
 CT_TEMPLATE_STORAGE="${CT_TEMPLATE_STORAGE:-local}"
-CT_TEMPLATE_DISTRO="${CP_TEMPLATE:-debian-13-slim}"
+CT_TEMPLATE_DISTRO="${CP_TEMPLATE:-debian-13.4-slim}"
 NET_BRIDGE="${CP_NET_BRIDGE:-vmbr0}"
 NET_IP="${CP_NET_IP:-10.0.0.20/24}"
 NET_GW="${CP_NET_GW:-10.0.0.1}"
@@ -237,14 +278,7 @@ confirm_settings "Control Plane LXC — CT $CT_ID" \
   "TZ=$TZ"
 
 # ── Find and download template ───────────────────────────────────────────────
-log_info "Finding latest $CT_TEMPLATE_DISTRO template..."
-TEMPLATE=$(find_latest_template "$CT_TEMPLATE_DISTRO")
-[ -n "$TEMPLATE" ] || die "No template found matching '$CT_TEMPLATE_DISTRO'"
-log_ok "Template: $TEMPLATE"
-
-log_info "Ensuring template is downloaded..."
-download_template "$CT_TEMPLATE_STORAGE" "$TEMPLATE"
-log_ok "Template ready"
+prepare_template "$CT_TEMPLATE_DISTRO" "$CT_TEMPLATE_STORAGE"
 
 # ── Create container ─────────────────────────────────────────────────────────
 log_info "Creating LXC container $CT_ID..."

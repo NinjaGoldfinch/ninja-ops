@@ -112,9 +112,6 @@ PG_HOSTNAME="$REPLY"
 prompt_default "Storage pool" "local-lvm" "local-lvm, local, zfspool"
 PG_STORAGE="$REPLY"
 
-prompt_default "Template" "debian-13-slim" "debian-13-slim, debian-13, debian-12"
-PG_TEMPLATE="$REPLY"
-
 prompt_default "Timezone" "Pacific/Auckland" "UTC, Europe/London, America/New_York"
 PG_TZ="$REPLY"
 
@@ -171,9 +168,6 @@ REDIS_HOSTNAME="$REPLY"
 prompt_default "Storage pool" "local-lvm"
 REDIS_STORAGE="$REPLY"
 
-prompt_default "Template" "debian-13-slim"
-REDIS_TEMPLATE="$REPLY"
-
 prompt_default "Timezone" "$PG_TZ"
 REDIS_TZ="$REPLY"
 
@@ -223,9 +217,6 @@ CP_HOSTNAME="$REPLY"
 
 prompt_default "Storage pool" "local-lvm"
 CP_STORAGE="$REPLY"
-
-prompt_default "Template" "debian-13-slim"
-CP_TEMPLATE="$REPLY"
 
 prompt_default "Timezone" "$PG_TZ"
 CP_TZ="$REPLY"
@@ -279,9 +270,6 @@ DASH_HOSTNAME="$REPLY"
 
 prompt_default "Storage pool" "local-lvm"
 DASH_STORAGE="$REPLY"
-
-prompt_default "Template" "debian-13-slim"
-DASH_TEMPLATE="$REPLY"
 
 prompt_default "Timezone" "$PG_TZ"
 DASH_TZ="$REPLY"
@@ -368,7 +356,6 @@ GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
 PG_CT_ID=${PG_CT_ID}
 PG_HOSTNAME=${PG_HOSTNAME}
 PG_STORAGE=${PG_STORAGE}
-PG_TEMPLATE=${PG_TEMPLATE}
 PG_TZ=${PG_TZ}
 PG_NET_IP=${PG_NET_IP}
 PG_NET_GW=${PG_NET_GW}
@@ -387,7 +374,6 @@ PG_ALLOWED_NETWORK=${PG_ALLOWED_NETWORK}
 REDIS_CT_ID=${REDIS_CT_ID}
 REDIS_HOSTNAME=${REDIS_HOSTNAME}
 REDIS_STORAGE=${REDIS_STORAGE}
-REDIS_TEMPLATE=${REDIS_TEMPLATE}
 REDIS_TZ=${REDIS_TZ}
 REDIS_NET_IP=${REDIS_NET_IP}
 REDIS_NET_GW=${REDIS_NET_GW}
@@ -404,7 +390,6 @@ REDIS_MAXMEMORY_POLICY=${REDIS_MAXMEMORY_POLICY}
 CP_CT_ID=${CP_CT_ID}
 CP_HOSTNAME=${CP_HOSTNAME}
 CP_STORAGE=${CP_STORAGE}
-CP_TEMPLATE=${CP_TEMPLATE}
 CP_TZ=${CP_TZ}
 CP_NET_IP=${CP_NET_IP}
 CP_NET_GW=${CP_NET_GW}
@@ -422,7 +407,6 @@ CP_GITHUB_TOKEN=${CP_GITHUB_TOKEN}
 DASH_CT_ID=${DASH_CT_ID}
 DASH_HOSTNAME=${DASH_HOSTNAME}
 DASH_STORAGE=${DASH_STORAGE}
-DASH_TEMPLATE=${DASH_TEMPLATE}
 DASH_TZ=${DASH_TZ}
 DASH_NET_IP=${DASH_NET_IP}
 DASH_NET_GW=${DASH_NET_GW}
