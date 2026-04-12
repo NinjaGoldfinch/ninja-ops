@@ -122,7 +122,7 @@ Environment variables (all optional):
   CT_SWAP               Swap in MB (default: 256)
   CT_CORES              CPU cores (default: 1)
   CT_TEMPLATE_STORAGE   Template storage (default: local)
-  CT_TEMPLATE_DISTRO    Distro pattern (default: debian-12)
+  CT_TEMPLATE_DISTRO    Distro pattern (default: debian-13-slim)
   NET_BRIDGE            Network bridge (default: vmbr0)
   NET_IP                IP with CIDR (default: 10.0.0.11/24)
   NET_GW                Gateway (default: 10.0.0.1)
@@ -154,7 +154,7 @@ CT_MEMORY="${CT_MEMORY:-512}"
 CT_SWAP="${CT_SWAP:-256}"
 CT_CORES="${CT_CORES:-1}"
 CT_TEMPLATE_STORAGE="${CT_TEMPLATE_STORAGE:-local}"
-CT_TEMPLATE_DISTRO="${CT_TEMPLATE_DISTRO:-debian-13}"
+CT_TEMPLATE_DISTRO="${CT_TEMPLATE_DISTRO:-debian-13-slim}"
 NET_BRIDGE="${NET_BRIDGE:-vmbr0}"
 NET_IP="${NET_IP:-10.0.0.11/24}"
 NET_GW="${NET_GW:-10.0.0.1}"
@@ -192,7 +192,7 @@ if [ "${OPT_YES:-0}" -eq 0 ]; then
   CT_HOSTNAME="$REPLY"
   prompt_default "Storage" "$CT_STORAGE" "local-lvm, local, zfspool"
   CT_STORAGE="$REPLY"
-  prompt_default "Template" "$CT_TEMPLATE_DISTRO" "debian-12, debian-13, ubuntu-24.04"
+  prompt_default "Template" "$CT_TEMPLATE_DISTRO" "debian-13-slim, debian-13, debian-12, ubuntu-24.04"
   CT_TEMPLATE_DISTRO="$REPLY"
   prompt_default "Timezone" "$TZ" "UTC, Europe/London, America/New_York, Australia/Sydney"
   TZ="$REPLY"
