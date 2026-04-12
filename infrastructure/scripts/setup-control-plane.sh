@@ -326,12 +326,13 @@ if [ -n "$GITHUB_TOKEN" ]; then
 fi
 exec_ct "$CT_ID" "
   if [ -d '${INSTALL_DIR}/.git' ]; then
-    git -C '${INSTALL_DIR}' fetch origin && git -C '${INSTALL_DIR}' reset --hard origin/${REPO_BRANCH}
+    sudo -u ${SERVICE_USER} git -C '${INSTALL_DIR}' fetch origin
+    sudo -u ${SERVICE_USER} git -C '${INSTALL_DIR}' reset --hard origin/${REPO_BRANCH}
   else
     rm -rf '${INSTALL_DIR}'
     git clone --branch ${REPO_BRANCH} ${CLONE_URL} ${INSTALL_DIR}
-  fi
-  chown -R ${SERVICE_USER}:${SERVICE_USER} ${INSTALL_DIR}"
+    chown -R ${SERVICE_USER}:${SERVICE_USER} ${INSTALL_DIR}
+  fi"
 log_ok "Repository ready at $INSTALL_DIR"
 
 # ── Install deps and build ───────────────────────────────────────────────────
