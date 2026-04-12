@@ -75,6 +75,12 @@ if [ "${_NINJA_COMMON_LOADED:-}" != "1" ]; then
   print_box_title() { local _t="$1" _tlen=${#1} _pad_l=$(( (_BOX_INNER - ${#1}) / 2 )) _pad_r=$(( _BOX_INNER - ${#1} - (_BOX_INNER - ${#1}) / 2 )); printf '║'; _print_n_chars ' ' "$_pad_l"; printf '%s' "$_t"; _print_n_chars ' ' "$_pad_r"; printf '║\n'; }
   print_box_blank() { printf '║\n'; }
   print_box_kv() { printf '║  %s =\n║    %s\n' "$1" "$2"; }
+  prompt_default() {
+    local _hint=""
+    [ -n "${3:-}" ] && _hint=" ${C_YLW}(e.g. $3)${C_RST}"
+    printf '%s[ninja]%s %s [%s]%s: ' "$C_CYN" "$C_RST" "$1" "$2" "$_hint"
+    read -r REPLY; [ -z "$REPLY" ] && REPLY="$2"
+  }
   confirm_settings() {
     local _title="$1"; shift; printf '\n'; print_box_top; print_box_title "$_title"; print_box_mid; print_box_blank
     for _kv in "$@"; do print_box_kv "${_kv%%=*}" "${_kv#*=}"; done
@@ -149,7 +155,7 @@ CT_MEMORY="${CT_MEMORY:-2048}"
 CT_SWAP="${CT_SWAP:-512}"
 CT_CORES="${CT_CORES:-2}"
 CT_TEMPLATE_STORAGE="${CT_TEMPLATE_STORAGE:-local}"
-CT_TEMPLATE_DISTRO="${CT_TEMPLATE_DISTRO:-debian-12}"
+CT_TEMPLATE_DISTRO="${CT_TEMPLATE_DISTRO:-debian-13}"
 NET_BRIDGE="${NET_BRIDGE:-vmbr0}"
 NET_IP="${NET_IP:-10.0.0.20/24}"
 NET_GW="${NET_GW:-10.0.0.1}"
@@ -167,6 +173,82 @@ CP_PORT="${CP_PORT:-3000}"
 # Required
 DATABASE_URL="${DATABASE_URL:-}"
 REDIS_URL="${REDIS_URL:-}"
+
+# ── Interactive configuration ────────────────────────────────────────────────
+if [ "${OPT_YES:-0}" -eq 0 ]; then
+  printf '\n'
+  log_info "Container  (press Enter to accept defaults)"
+  printf '\n'
+  prompt_default "VMID" "$CT_ID" "any unused Proxmox container ID"
+  CT_ID="$REPLY"
+  prompt_default "Hostname" "$CT_HOSTNAME"
+  CT_HOSTNAME="$REPLY"
+  prompt_default "Storage" "$CT_STORAGE" "local-lvm, local, zfspool"
+  CT_STORAGE="$REPLY"
+  prompt_default "Template" "$CT_TEMPLATE_DISTRO" "debian-12, debian-13, ubuntu-24.04"
+  CT_TEMPLATE_DISTRO="$REPLY"
+  prompt_default "Timezone" "$TZ" "UTC, Europe/London, America/New_York, Australia/Sydney"
+  TZ="$REPLY"
+
+  printf '\n'
+  log_info "Network"
+  printf '\n'
+  prompt_default "IP/CIDR" "$NET_IP" "10.0.0.x/24"
+  NET_IP="$REPLY"
+  prompt_default "Gateway" "$NET_GW"
+  NET_GW="$REPLY"
+  prompt_default "DNS" "$NET_DNS" "1.1.1.1, 8.8.8.8"
+  NET_DNS="$REPLY"
+  prompt_default "Bridge" "$NET_BRIDGE" "vmbr0, vmbr1"
+  NET_BRIDGE="$REPLY"
+
+  printf '\n'
+  log_info "Resources"
+  printf '\n'
+  prompt_default "Disk (GB)" "$CT_DISK" "minimum 4"
+  CT_DISK="$REPLY"
+  prompt_default "Memory (MB)" "$CT_MEMORY" "1024, 2048, 4096"
+  CT_MEMORY="$REPLY"
+  prompt_default "Swap (MB)" "$CT_SWAP"
+  CT_SWAP="$REPLY"
+  prompt_default "Cores" "$CT_CORES" "1, 2, 4"
+  CT_CORES="$REPLY"
+
+  printf '\n'
+  log_info "Connections"
+  printf '\n'
+  while true; do
+    prompt_default "DATABASE_URL" "${DATABASE_URL:-}" "postgres://ninja:pw@10.0.0.10:5432/ninja_ops"
+    DATABASE_URL="$REPLY"
+    case "$DATABASE_URL" in postgres://?*) break ;; esac
+    log_warn "Must start with postgres://"
+  done
+  while true; do
+    prompt_default "REDIS_URL" "${REDIS_URL:-}" "redis://10.0.0.11:6379, redis://:pass@host:6379"
+    REDIS_URL="$REPLY"
+    case "$REDIS_URL" in redis://*) break ;; esac
+    log_warn "Must start with redis://"
+  done
+
+  printf '\n'
+  log_info "Service"
+  printf '\n'
+  prompt_default "API port" "$CP_PORT" "3000, 8080"
+  CP_PORT="$REPLY"
+  prompt_default "Repo branch" "$REPO_BRANCH" "main, develop"
+  REPO_BRANCH="$REPLY"
+  prompt_default "GitHub token" "${GITHUB_TOKEN:-}" "required for private repos, leave empty for public"
+  GITHUB_TOKEN="$REPLY"
+
+  printf '\n'
+  log_info "Admin account"
+  printf '\n'
+  prompt_default "Username" "$ADMIN_USERNAME"
+  ADMIN_USERNAME="$REPLY"
+  prompt_default "Password" "$ADMIN_PASSWORD" "leave as-is to use generated value"
+  ADMIN_PASSWORD="$REPLY"
+  printf '\n'
+fi
 
 [ -z "$DATABASE_URL" ] && die "DATABASE_URL is required (e.g. postgres://ninja:pw@10.0.0.10:5432/ninja_ops)"
 [ -z "$REDIS_URL" ]    && die "REDIS_URL is required (e.g. redis://10.0.0.11:6379)"

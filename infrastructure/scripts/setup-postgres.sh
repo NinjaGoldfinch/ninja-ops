@@ -76,6 +76,12 @@ if [ "${_NINJA_COMMON_LOADED:-}" != "1" ]; then
   print_box_title() { local _t="$1" _tlen=${#1} _pad_l=$(( (_BOX_INNER - ${#1}) / 2 )) _pad_r=$(( _BOX_INNER - ${#1} - (_BOX_INNER - ${#1}) / 2 )); printf '║'; _print_n_chars ' ' "$_pad_l"; printf '%s' "$_t"; _print_n_chars ' ' "$_pad_r"; printf '║\n'; }
   print_box_blank() { printf '║\n'; }
   print_box_kv() { printf '║  %s =\n║    %s\n' "$1" "$2"; }
+  prompt_default() {
+    local _hint=""
+    [ -n "${3:-}" ] && _hint=" ${C_YLW}(e.g. $3)${C_RST}"
+    printf '%s[ninja]%s %s [%s]%s: ' "$C_CYN" "$C_RST" "$1" "$2" "$_hint"
+    read -r REPLY; [ -z "$REPLY" ] && REPLY="$2"
+  }
   confirm_settings() {
     local _title="$1"; shift; printf '\n'; print_box_top; print_box_title "$_title"; print_box_mid; print_box_blank
     for _kv in "$@"; do print_box_kv "${_kv%%=*}" "${_kv#*=}"; done
@@ -142,7 +148,7 @@ CT_MEMORY="${CT_MEMORY:-1024}"
 CT_SWAP="${CT_SWAP:-512}"
 CT_CORES="${CT_CORES:-2}"
 CT_TEMPLATE_STORAGE="${CT_TEMPLATE_STORAGE:-local}"
-CT_TEMPLATE_DISTRO="${CT_TEMPLATE_DISTRO:-debian-12}"
+CT_TEMPLATE_DISTRO="${CT_TEMPLATE_DISTRO:-debian-13}"
 NET_BRIDGE="${NET_BRIDGE:-vmbr0}"
 NET_IP="${NET_IP:-10.0.0.10/24}"
 NET_GW="${NET_GW:-10.0.0.1}"
@@ -155,6 +161,62 @@ PG_ALLOWED_NETWORK="${PG_ALLOWED_NETWORK:-10.0.0.0/24}"
 PG_MAX_CONNECTIONS="${PG_MAX_CONNECTIONS:-100}"
 PG_SHARED_BUFFERS="${PG_SHARED_BUFFERS:-256MB}"
 TZ="${TZ:-Pacific/Auckland}"
+
+# ── Interactive configuration ────────────────────────────────────────────────
+if [ "${OPT_YES:-0}" -eq 0 ]; then
+  printf '\n'
+  log_info "Container  (press Enter to accept defaults)"
+  printf '\n'
+  prompt_default "VMID" "$CT_ID" "any unused Proxmox container ID"
+  CT_ID="$REPLY"
+  prompt_default "Hostname" "$CT_HOSTNAME"
+  CT_HOSTNAME="$REPLY"
+  prompt_default "Storage" "$CT_STORAGE" "local-lvm, local, zfspool"
+  CT_STORAGE="$REPLY"
+  prompt_default "Template" "$CT_TEMPLATE_DISTRO" "debian-12, debian-13, ubuntu-24.04"
+  CT_TEMPLATE_DISTRO="$REPLY"
+  prompt_default "Timezone" "$TZ" "UTC, Europe/London, America/New_York, Australia/Sydney"
+  TZ="$REPLY"
+
+  printf '\n'
+  log_info "Network"
+  printf '\n'
+  prompt_default "IP/CIDR" "$NET_IP" "10.0.0.x/24"
+  NET_IP="$REPLY"
+  prompt_default "Gateway" "$NET_GW"
+  NET_GW="$REPLY"
+  prompt_default "DNS" "$NET_DNS" "1.1.1.1, 8.8.8.8"
+  NET_DNS="$REPLY"
+  prompt_default "Bridge" "$NET_BRIDGE" "vmbr0, vmbr1"
+  NET_BRIDGE="$REPLY"
+
+  printf '\n'
+  log_info "Resources"
+  printf '\n'
+  prompt_default "Disk (GB)" "$CT_DISK" "minimum 4"
+  CT_DISK="$REPLY"
+  prompt_default "Memory (MB)" "$CT_MEMORY" "512, 1024, 2048"
+  CT_MEMORY="$REPLY"
+  prompt_default "Swap (MB)" "$CT_SWAP"
+  CT_SWAP="$REPLY"
+  prompt_default "Cores" "$CT_CORES" "1, 2, 4"
+  CT_CORES="$REPLY"
+
+  printf '\n'
+  log_info "PostgreSQL"
+  printf '\n'
+  prompt_default "Version" "$PG_VERSION" "17, 18"
+  PG_VERSION="$REPLY"
+  prompt_default "Database" "$PG_DB"
+  PG_DB="$REPLY"
+  prompt_default "User" "$PG_USER"
+  PG_USER="$REPLY"
+  prompt_default "Password" "$PG_PASSWORD" "leave as-is to use generated value"
+  PG_PASSWORD="$REPLY"
+  prompt_default "Allowed network" "$PG_ALLOWED_NETWORK" "10.0.0.0/24, 0.0.0.0/0"
+  PG_ALLOWED_NETWORK="$REPLY"
+  printf '\n'
+fi
 
 # ── Preflight ────────────────────────────────────────────────────────────────
 check_proxmox_host

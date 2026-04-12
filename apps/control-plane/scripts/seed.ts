@@ -8,7 +8,12 @@ if (!databaseUrl) {
 }
 
 const username = process.env['ADMIN_USERNAME'] ?? 'admin'
-const password = process.env['ADMIN_PASSWORD'] ?? 'changeme123!'
+const password = process.env['ADMIN_PASSWORD']
+
+if (!password) {
+  console.error('ADMIN_PASSWORD is required — set it before running db:seed')
+  process.exit(1)
+}
 
 const sql = postgres(databaseUrl)
 

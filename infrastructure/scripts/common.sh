@@ -99,6 +99,16 @@ configure_locale_timezone() {  # $1 = CT_ID, $2 = timezone
     locale-gen"
 }
 
+# ── Interactive prompt ───────────────────────────────────────────────────────
+# prompt_default "Label" "default" ["hint"]  — result stored in $REPLY
+prompt_default() {
+  local _hint=""
+  [ -n "${3:-}" ] && _hint=" ${C_YLW}(e.g. $3)${C_RST}"
+  printf '%s[ninja]%s %s [%s]%s: ' "$C_CYN" "$C_RST" "$1" "$2" "$_hint"
+  read -r REPLY
+  [ -z "$REPLY" ] && REPLY="$2"
+}
+
 # ── Flag parsing ─────────────────────────────────────────────────────────────
 OPT_YES=${OPT_YES:-0}
 OPT_FORCE=${OPT_FORCE:-0}
