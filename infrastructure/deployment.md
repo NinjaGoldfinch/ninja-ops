@@ -67,7 +67,9 @@ AGENT_SECRET=${AGENT_SECRET}
 GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
 EOF
 
-printf '\n\033[0;33mSave /tmp/ninja-deploy.env to your password manager before continuing.\033[0m\n\n'
+printf '\n\033[0;33m── Save these to your password manager ──\033[0m\n\n'
+cat /tmp/ninja-deploy.env
+printf '\n\033[0;33m─────────────────────────────────────────\033[0m\n\n'
 read -r -p "Press Enter once saved... "
 
 # ── Deploy ────────────────────────────────────────────────────────────────────
