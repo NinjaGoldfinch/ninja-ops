@@ -92,12 +92,13 @@ if [ "${_NINJA_COMMON_LOADED:-}" != "1" ]; then
         --nameserver "$NET_DNS" --unprivileged 1 --features nesting=1 --start 1
     fi
     pct status "$CT_ID" | grep -q running || pct start "$CT_ID"
+    log_info "Waiting for CT $CT_ID to get network..."
     local i=0
     while [ "$i" -lt 30 ]; do
       pct exec "$CT_ID" -- ping -c1 -W1 8.8.8.8 >/dev/null 2>&1 && break
-      sleep 2; i=$((i + 1))
-    done
-    [ "$i" -lt 30 ] || die "CT $CT_ID did not get network after 60s"
+      printf '.'; sleep 2; i=$((i + 1))
+    done; printf '\n'
+    [ "$i" -lt 30 ] || die "CT $CT_ID did not get network after 60s — check bridge/gateway config"
     if [ "$NET_IP" = "dhcp" ]; then
       log_info "Detecting DHCP-assigned IP for CT $CT_ID..."
       sleep 2

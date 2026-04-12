@@ -165,14 +165,17 @@ create_lxc() {
 
   pct status "$CT_ID" | grep -q running || pct start "$CT_ID"
 
-  # Wait for network
+  # Wait for container to boot and get network
+  log_info "Waiting for CT $CT_ID to get network..."
   local i=0
   while [ "$i" -lt 30 ]; do
     pct exec "$CT_ID" -- ping -c1 -W1 8.8.8.8 >/dev/null 2>&1 && break
+    printf '.'
     sleep 2
     i=$((i + 1))
   done
-  [ "$i" -lt 30 ] || die "CT $CT_ID did not get network after 60s"
+  printf '\n'
+  [ "$i" -lt 30 ] || die "CT $CT_ID did not get network after 60s — check bridge/gateway config"
 
   # If DHCP was used, detect assigned IP and make static
   if [ "$NET_IP" = "dhcp" ]; then
