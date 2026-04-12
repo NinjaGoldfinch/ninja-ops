@@ -94,10 +94,10 @@ if [ "${_NINJA_COMMON_LOADED:-}" != "1" ]; then
     log_info "Waiting for CT $CT_ID to get network..."
     local i=0
     while [ "$i" -lt 30 ]; do
-      pct exec "$CT_ID" -- ping -c1 -W1 8.8.8.8 >/dev/null 2>&1 && break
+      pct exec "$CT_ID" -- sh -c 'awk "NR>1 && \$3!=\"00000000\"" /proc/net/route | grep -q .' >/dev/null 2>&1 && break
       printf '.'; sleep 2; i=$((i + 1))
     done; printf '\n'
-    [ "$i" -lt 30 ] || die "CT $CT_ID did not get network after 60s — check bridge/gateway config"
+    [ "$i" -lt 30 ] || die "CT $CT_ID did not get a default route after 60s — check bridge/gateway config"
     if [ "$NET_IP" = "dhcp" ]; then
       log_info "Detecting DHCP-assigned IP for CT $CT_ID..."
       sleep 2
@@ -112,7 +112,7 @@ if [ "${_NINJA_COMMON_LOADED:-}" != "1" ]; then
   exec_ct() { pct exec "$1" -- bash -c "$2"; }
   install_base_packages() {
     exec_ct "$1" "apt-get update -qq && apt-get upgrade -y -qq && \
-      apt-get install -y -qq curl wget gnupg ca-certificates sudo htop lsb-release git"
+      apt-get install -y -qq curl wget gnupg ca-certificates sudo htop lsb-release git iproute2 iputils-ping"
   }
   configure_locale_timezone() {
     exec_ct "$1" "ln -sf /usr/share/zoneinfo/$2 /etc/localtime && \

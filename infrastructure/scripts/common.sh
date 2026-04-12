@@ -165,17 +165,20 @@ create_lxc() {
 
   pct status "$CT_ID" | grep -q running || pct start "$CT_ID"
 
-  # Wait for container to boot and get network
+  # Wait for container to boot and get a default route
+  # Uses /proc/net/route (always present, no iproute2 needed): Gateway col != 00000000 = route exists
   log_info "Waiting for CT $CT_ID to get network..."
   local i=0
   while [ "$i" -lt 30 ]; do
-    pct exec "$CT_ID" -- ping -c1 -W1 8.8.8.8 >/dev/null 2>&1 && break
+    pct exec "$CT_ID" -- sh -c \
+      'awk "NR>1 && \$3!=\"00000000\"" /proc/net/route | grep -q .' \
+      >/dev/null 2>&1 && break
     printf '.'
     sleep 2
     i=$((i + 1))
   done
   printf '\n'
-  [ "$i" -lt 30 ] || die "CT $CT_ID did not get network after 60s — check bridge/gateway config"
+  [ "$i" -lt 30 ] || die "CT $CT_ID did not get a default route after 60s — check bridge/gateway config"
 
   # If DHCP was used, detect assigned IP and make static
   if [ "$NET_IP" = "dhcp" ]; then
@@ -196,7 +199,7 @@ exec_ct() { pct exec "$1" -- bash -c "$2"; }
 # ── Base package installation ────────────────────────────────────────────────
 install_base_packages() {  # $1 = CT_ID
   exec_ct "$1" "apt-get update -qq && apt-get upgrade -y -qq && \
-    apt-get install -y -qq curl wget gnupg ca-certificates sudo htop lsb-release git"
+    apt-get install -y -qq curl wget gnupg ca-certificates sudo htop lsb-release git iproute2 iputils-ping"
 }
 
 # ── Locale and timezone ─────────────────────────────────────────────────────
