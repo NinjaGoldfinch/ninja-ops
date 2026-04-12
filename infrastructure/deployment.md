@@ -17,7 +17,7 @@ Provisions four Debian 12 LXC containers on a Proxmox VE host using `pct create`
 | postgres-01 | 200 | postgres-01 | 10.0.0.10 | PostgreSQL 17 |
 | redis-01 | 201 | redis-01 | 10.0.0.11 | Redis 7 |
 | control-plane-01 | 202 | control-plane-01 | 10.0.0.20 | Fastify API |
-| dashboard-01 | 203 | dashboard-01 | 10.0.0.21 | React + Caddy |
+| dashboard-01 | 203 | dashboard-01 | 10.0.0.21 | React + serve |
 
 All containers are unprivileged, on bridge `vmbr0`, gateway `10.0.0.1`.
 
@@ -28,8 +28,8 @@ All containers are unprivileged, on bridge `vmbr0`, gateway `10.0.0.1`.
 | postgres-01 | 8 GB | 1 GB | 512 MB | 2 |
 | redis-01 | 4 GB | 512 MB | 256 MB | 1 |
 | control-plane-01 | 8 GB | 2 GB | 512 MB | 2 |
-| dashboard-01 | 4 GB | 1 GB | 256 MB | 1 |
-| **Total** | **24 GB** | **4.5 GB** | **1.5 GB** | **6** |
+| dashboard-01 | 4 GB | 512 MB | 256 MB | 1 |
+| **Total** | **24 GB** | **4 GB** | **1.5 GB** | **6** |
 
 ## Quick Start
 
@@ -79,13 +79,15 @@ bash infrastructure/scripts/setup-control-plane.sh --yes
 
 ### 4. Dashboard
 
+Builds on CT 202 then transfers `dist/` — CT 202 must be running.
+
 ```bash
 bash infrastructure/scripts/setup-dashboard.sh
 ```
 
-With custom control plane address:
+With a custom API URL baked into the bundle:
 ```bash
-CONTROL_PLANE_INTERNAL=10.0.0.20:3000 \
+VITE_API_URL=http://10.0.0.20:3000 \
 bash infrastructure/scripts/setup-dashboard.sh --yes
 ```
 
@@ -205,14 +207,17 @@ curl -sSL https://raw.githubusercontent.com/NinjaGoldfinch/ninja-ops/main/infras
 | `CT_ID` | `203` | Proxmox container ID |
 | `CT_HOSTNAME` | `dashboard-01` | Container hostname |
 | `CT_DISK` | `4` | Disk size (GB) |
-| `CT_MEMORY` | `1024` | Memory (MB) |
+| `CT_MEMORY` | `512` | Memory (MB) |
 | `CT_CORES` | `1` | CPU cores |
 | `NET_IP` | `10.0.0.21/24` | Container IP/CIDR |
-| `CONTROL_PLANE_INTERNAL` | `10.0.0.20:3000` | Control plane backend address |
-| `CADDY_PORT` | `80` | Port Caddy listens on |
+| `CT_CP_ID` | `202` | Control plane CT to build on |
+| `CP_INSTALL_DIR` | `/opt/ninja-ops` | Repo path on the control plane CT |
+| `CP_SERVICE_USER` | `ninja` | Service user on the control plane CT |
+| `VITE_API_URL` | `http://10.0.0.20:3000` | Control plane URL baked into the bundle |
+| `DASH_DIR` | `/opt/dashboard` | Directory to serve from |
+| `SERVE_PORT` | `8080` | Port `serve` listens on |
+| `SERVICE_USER` | `ninja` | System user in this container |
 | `NODE_VERSION` | `22` | Node.js version |
-| `REPO_BRANCH` | `main` | Branch to clone |
-| `GITHUB_TOKEN` | *(empty)* | Token for private repo |
 | `TZ` | `Pacific/Auckland` | Timezone |
 
 ---
@@ -221,7 +226,7 @@ curl -sSL https://raw.githubusercontent.com/NinjaGoldfinch/ninja-ops/main/infras
 
 After all four scripts complete:
 
-1. Open the dashboard: `http://10.0.0.21`
+1. Open the dashboard: `http://10.0.0.21:8080`
 2. Log in with the admin credentials printed by `setup-control-plane.sh`
 3. Verify the API: `curl http://10.0.0.20:3000/healthz`
 
@@ -260,14 +265,35 @@ pct exec 202 -- bash -c "
 
 ### Dashboard
 
+Build on the control plane, then rerun the setup script (CT 202 stays running throughout):
+
 ```bash
-pct exec 203 -- bash -c "
+bash infrastructure/scripts/setup-dashboard.sh --yes --force
+```
+
+Or manually:
+
+```bash
+# 1. Build on CT 202
+pct exec 202 -- bash -c "
   cd /opt/ninja-ops && \
   sudo -u ninja git pull && \
   sudo -u ninja pnpm install --frozen-lockfile && \
   sudo -u ninja pnpm --filter @ninja/types build && \
-  VITE_API_URL='' sudo -u ninja pnpm --filter @ninja/dashboard build && \
-  systemctl reload caddy
+  VITE_API_URL=http://10.0.0.20:3000 sudo -u ninja pnpm --filter @ninja/dashboard build && \
+  tar -czf /tmp/ninja-dashboard.tar.gz -C /opt/ninja-ops/apps/dashboard dist
+"
+
+# 2. Transfer and deploy to CT 203
+pct pull 202 /tmp/ninja-dashboard.tar.gz /tmp/ninja-dashboard.tar.gz
+pct exec 202 -- rm /tmp/ninja-dashboard.tar.gz
+pct push 203 /tmp/ninja-dashboard.tar.gz /tmp/ninja-dashboard.tar.gz
+rm /tmp/ninja-dashboard.tar.gz
+pct exec 203 -- bash -c "
+  tar -xzf /tmp/ninja-dashboard.tar.gz -C /opt/dashboard && \
+  chown -R ninja:ninja /opt/dashboard && \
+  rm /tmp/ninja-dashboard.tar.gz && \
+  systemctl restart ninja-dashboard
 "
 ```
 
@@ -281,8 +307,8 @@ pct exec 203 -- bash -c "
 # Control plane
 pct exec 202 -- journalctl -u ninja-control-plane -f
 
-# Caddy (dashboard)
-pct exec 203 -- journalctl -u caddy -f
+# Dashboard (serve)
+pct exec 203 -- journalctl -u ninja-dashboard -f
 
 # PostgreSQL
 pct exec 200 -- journalctl -u postgresql -f

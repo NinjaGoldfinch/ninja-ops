@@ -2,9 +2,15 @@
 # setup-dashboard.sh — Provision the ninja-ops dashboard in an LXC container
 # Self-contained: can be curl-piped or run from the scripts/ directory.
 #
+# The dashboard is built on the control plane container (which already has
+# pnpm and the repo), then the dist/ folder is transferred here and served
+# by `serve`. No build tooling needed in this container — just Node.js.
+#
 # Usage:
 #   bash setup-dashboard.sh [--yes] [--force] [--help]
-#   CONTROL_PLANE_INTERNAL=10.0.0.20:3000 bash setup-dashboard.sh --yes
+#   VITE_API_URL=http://10.0.0.20:3000 bash setup-dashboard.sh --yes
+#
+# Run setup-control-plane.sh first.
 
 set -euo pipefail
 
@@ -25,7 +31,6 @@ if [ "${_NINJA_COMMON_LOADED:-}" != "1" ]; then
   log_warn() { printf '%s[ninja]%s %s⚠%s  %s\n'  "$C_CYN" "$C_RST" "$C_YLW" "$C_RST" "$1"; }
   log_fail() { printf '%s[ninja]%s %s✗%s %s\n'   "$C_CYN" "$C_RST" "$C_RED" "$C_RST" "$1" >&2; }
   die()      { log_fail "$1"; exit 1; }
-  gen_secret() { openssl rand -hex "$1"; }
   check_proxmox_host() {
     command -v pct  >/dev/null 2>&1 || die "pct not found — run this on a Proxmox VE host"
     command -v pvesh >/dev/null 2>&1 || die "pvesh not found — run this on a Proxmox VE host"
@@ -54,7 +59,7 @@ if [ "${_NINJA_COMMON_LOADED:-}" != "1" ]; then
   exec_ct() { pct exec "$1" -- bash -c "$2"; }
   install_base_packages() {
     exec_ct "$1" "apt-get update -qq && apt-get upgrade -y -qq && \
-      apt-get install -y -qq curl wget gnupg ca-certificates sudo htop lsb-release git"
+      apt-get install -y -qq curl wget gnupg ca-certificates sudo htop lsb-release"
   }
   configure_locale_timezone() {
     exec_ct "$1" "ln -sf /usr/share/zoneinfo/$2 /etc/localtime && \
@@ -69,7 +74,7 @@ if [ "${_NINJA_COMMON_LOADED:-}" != "1" ]; then
   print_box_top() { printf '╔'; _print_n_chars '═' "$_BOX_INNER"; printf '╗\n'; }
   print_box_mid() { printf '╠'; _print_n_chars '═' "$_BOX_INNER"; printf '╣\n'; }
   print_box_bot() { printf '╚'; _print_n_chars '═' "$_BOX_INNER"; printf '╝\n'; }
-  print_box_title() { local _t="$1" _tlen=${#1} _pad_l=$(( (_BOX_INNER - ${#1}) / 2 )) _pad_r=$(( _BOX_INNER - ${#1} - (_BOX_INNER - ${#1}) / 2 )); printf '║'; _print_n_chars ' ' "$_pad_l"; printf '%s' "$_t"; _print_n_chars ' ' "$_pad_r"; printf '║\n'; }
+  print_box_title() { local _t="$1" _pad_l=$(( (_BOX_INNER - ${#1}) / 2 )) _pad_r=$(( _BOX_INNER - ${#1} - (_BOX_INNER - ${#1}) / 2 )); printf '║'; _print_n_chars ' ' "$_pad_l"; printf '%s' "$_t"; _print_n_chars ' ' "$_pad_r"; printf '║\n'; }
   print_box_blank() { printf '║\n'; }
   print_box_kv() { printf '║  %s =\n║    %s\n' "$1" "$2"; }
   confirm_settings() {
@@ -87,7 +92,11 @@ show_help() {
   cat <<'EOF'
 Usage: setup-dashboard.sh [OPTIONS]
 
-Provision the ninja-ops dashboard (React + Caddy) in an LXC container on Proxmox VE.
+Provision the ninja-ops dashboard in an LXC container on Proxmox VE.
+
+The dashboard is built on the control plane container (CT_CP_ID), then
+dist/ is transferred to this container and served by `serve` on port 8080.
+Run setup-control-plane.sh before this script.
 
 Options:
   --yes, -y    Skip confirmation prompt
@@ -95,24 +104,28 @@ Options:
   --help, -h   Show this help message
 
 Environment variables (all optional):
-  CT_ID                   Container ID (default: 203)
-  CT_HOSTNAME             Hostname (default: dashboard-01)
-  CT_STORAGE              Storage pool (default: local-lvm)
-  CT_DISK                 Disk size in GB (default: 4)
-  CT_MEMORY               Memory in MB (default: 1024)
-  CT_SWAP                 Swap in MB (default: 256)
-  CT_CORES                CPU cores (default: 1)
-  NET_IP                  IP with CIDR (default: 10.0.0.21/24)
-  NET_GW                  Gateway (default: 10.0.0.1)
-  CONTROL_PLANE_INTERNAL  Control plane address (default: 10.0.0.20:3000)
-  CADDY_PORT              Port Caddy listens on (default: 80)
-  NODE_VERSION            Node.js version (default: 22)
-  REPO_URL                Git repo URL
-  REPO_BRANCH             Branch to clone (default: main)
-  GITHUB_TOKEN            Token for private repo (default: empty)
-  INSTALL_DIR             Install directory (default: /opt/ninja-ops)
-  SERVICE_USER            System user (default: ninja)
-  TZ                      Timezone (default: Pacific/Auckland)
+  CT_ID              Dashboard container ID (default: 203)
+  CT_HOSTNAME        Hostname (default: dashboard-01)
+  CT_STORAGE         Storage pool (default: local-lvm)
+  CT_DISK            Disk size in GB (default: 4)
+  CT_MEMORY          Memory in MB (default: 512)
+  CT_SWAP            Swap in MB (default: 256)
+  CT_CORES           CPU cores (default: 1)
+  CT_TEMPLATE_STORAGE  Template storage (default: local)
+  CT_TEMPLATE_DISTRO   Distro pattern (default: debian-12)
+  NET_BRIDGE         Network bridge (default: vmbr0)
+  NET_IP             IP with CIDR (default: 10.0.0.21/24)
+  NET_GW             Gateway (default: 10.0.0.1)
+  NET_DNS            DNS server (default: 1.1.1.1)
+  CT_CP_ID           Control plane container to build on (default: 202)
+  CP_INSTALL_DIR     Repo path on the control plane CT (default: /opt/ninja-ops)
+  CP_SERVICE_USER    Service user on the control plane CT (default: ninja)
+  VITE_API_URL       Control plane URL baked into the bundle (default: http://10.0.0.20:3000)
+  DASH_DIR           Directory to serve from in this container (default: /opt/dashboard)
+  SERVE_PORT         Port serve listens on (default: 8080)
+  SERVICE_USER       System user in this container (default: ninja)
+  NODE_VERSION       Node.js version (default: 22)
+  TZ                 Timezone (default: Pacific/Auckland)
 EOF
 }
 
@@ -131,7 +144,7 @@ CT_ID="${CT_ID:-203}"
 CT_HOSTNAME="${CT_HOSTNAME:-dashboard-01}"
 CT_STORAGE="${CT_STORAGE:-local-lvm}"
 CT_DISK="${CT_DISK:-4}"
-CT_MEMORY="${CT_MEMORY:-1024}"
+CT_MEMORY="${CT_MEMORY:-512}"
 CT_SWAP="${CT_SWAP:-256}"
 CT_CORES="${CT_CORES:-1}"
 CT_TEMPLATE_STORAGE="${CT_TEMPLATE_STORAGE:-local}"
@@ -140,18 +153,24 @@ NET_BRIDGE="${NET_BRIDGE:-vmbr0}"
 NET_IP="${NET_IP:-10.0.0.21/24}"
 NET_GW="${NET_GW:-10.0.0.1}"
 NET_DNS="${NET_DNS:-1.1.1.1}"
-CONTROL_PLANE_INTERNAL="${CONTROL_PLANE_INTERNAL:-10.0.0.20:3000}"
-CADDY_PORT="${CADDY_PORT:-80}"
-NODE_VERSION="${NODE_VERSION:-22}"
-REPO_URL="${REPO_URL:-https://github.com/NinjaGoldfinch/ninja-ops.git}"
-REPO_BRANCH="${REPO_BRANCH:-main}"
-GITHUB_TOKEN="${GITHUB_TOKEN:-}"
-INSTALL_DIR="${INSTALL_DIR:-/opt/ninja-ops}"
+CT_CP_ID="${CT_CP_ID:-202}"
+CP_INSTALL_DIR="${CP_INSTALL_DIR:-/opt/ninja-ops}"
+CP_SERVICE_USER="${CP_SERVICE_USER:-ninja}"
+VITE_API_URL="${VITE_API_URL:-http://10.0.0.20:3000}"
+DASH_DIR="${DASH_DIR:-/opt/dashboard}"
+SERVE_PORT="${SERVE_PORT:-8080}"
 SERVICE_USER="${SERVICE_USER:-ninja}"
+NODE_VERSION="${NODE_VERSION:-22}"
 TZ="${TZ:-Pacific/Auckland}"
 
 # ── Preflight ────────────────────────────────────────────────────────────────
 check_proxmox_host
+
+pct status "$CT_CP_ID" 2>/dev/null | grep -q running || \
+  die "Control plane CT $CT_CP_ID is not running — run setup-control-plane.sh first"
+
+exec_ct "$CT_CP_ID" "test -d ${CP_INSTALL_DIR}/apps/dashboard" || \
+  die "Dashboard source not found in CT $CT_CP_ID at ${CP_INSTALL_DIR}/apps/dashboard"
 
 if [ "${OPT_FORCE:-0}" -eq 1 ] && pct status "$CT_ID" >/dev/null 2>&1; then
   log_warn "Destroying existing CT $CT_ID (--force)"
@@ -166,10 +185,24 @@ confirm_settings "Dashboard LXC — CT $CT_ID" \
   "CT_STORAGE=$CT_STORAGE (${CT_DISK}GB)" \
   "CT_MEMORY=${CT_MEMORY}MB / ${CT_SWAP}MB swap / ${CT_CORES} core" \
   "NET_IP=$NET_IP (gw $NET_GW)" \
-  "CONTROL_PLANE_INTERNAL=$CONTROL_PLANE_INTERNAL" \
-  "CADDY_PORT=$CADDY_PORT" \
-  "REPO_BRANCH=$REPO_BRANCH" \
+  "CT_CP_ID=$CT_CP_ID (build source)" \
+  "VITE_API_URL=$VITE_API_URL" \
+  "SERVE_PORT=$SERVE_PORT" \
   "TZ=$TZ"
+
+# ── Build dashboard on control plane container ────────────────────────────────
+log_info "Building dashboard on CT $CT_CP_ID (VITE_API_URL=$VITE_API_URL)..."
+exec_ct "$CT_CP_ID" "cd ${CP_INSTALL_DIR} && \
+  sudo -u ${CP_SERVICE_USER} pnpm --filter @ninja/types build && \
+  VITE_API_URL='${VITE_API_URL}' sudo -u ${CP_SERVICE_USER} pnpm --filter @ninja/dashboard build"
+log_ok "Dashboard built on CT $CT_CP_ID"
+
+# ── Transfer dist/ to this container ─────────────────────────────────────────
+log_info "Transferring dist/ from CT $CT_CP_ID to CT $CT_ID..."
+exec_ct "$CT_CP_ID" "tar -czf /tmp/ninja-dashboard.tar.gz -C ${CP_INSTALL_DIR}/apps/dashboard dist"
+pct pull "$CT_CP_ID" /tmp/ninja-dashboard.tar.gz /tmp/ninja-dashboard.tar.gz
+exec_ct "$CT_CP_ID" "rm -f /tmp/ninja-dashboard.tar.gz"
+log_ok "dist/ pulled from CT $CT_CP_ID"
 
 # ── Find and download template ───────────────────────────────────────────────
 log_info "Finding latest $CT_TEMPLATE_DISTRO template..."
@@ -201,80 +234,50 @@ exec_ct "$CT_ID" "curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x 
   apt-get install -y -qq nodejs"
 log_ok "Node.js installed"
 
-log_info "Installing pnpm..."
-exec_ct "$CT_ID" "npm install -g pnpm"
-log_ok "pnpm installed"
-
-# ── Caddy ────────────────────────────────────────────────────────────────────
-log_info "Installing Caddy..."
-exec_ct "$CT_ID" "curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | \
-  gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg && \
-  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | \
-  tee /etc/apt/sources.list.d/caddy-stable.list && \
-  apt-get update -qq && apt-get install -y -qq caddy"
-log_ok "Caddy installed"
+# ── serve ─────────────────────────────────────────────────────────────────────
+log_info "Installing serve..."
+exec_ct "$CT_ID" "npm install -g serve"
+log_ok "serve installed"
 
 # ── Service user ─────────────────────────────────────────────────────────────
 log_info "Creating service user: $SERVICE_USER..."
 exec_ct "$CT_ID" "id -u ${SERVICE_USER} >/dev/null 2>&1 || useradd -m -r -s /bin/bash ${SERVICE_USER}"
 log_ok "Service user ready"
 
-# ── Clone repository ─────────────────────────────────────────────────────────
-log_info "Cloning repository (branch: $REPO_BRANCH)..."
-CLONE_URL="$REPO_URL"
-if [ -n "$GITHUB_TOKEN" ]; then
-  CLONE_URL="${REPO_URL/https:\/\//https://${GITHUB_TOKEN}@}"
-fi
-exec_ct "$CT_ID" "git clone --branch ${REPO_BRANCH} ${CLONE_URL} ${INSTALL_DIR} && \
-  chown -R ${SERVICE_USER}:${SERVICE_USER} ${INSTALL_DIR}"
-log_ok "Repository cloned to $INSTALL_DIR"
+# ── Deploy dist/ ──────────────────────────────────────────────────────────────
+log_info "Deploying dist/ to CT $CT_ID..."
+pct push "$CT_ID" /tmp/ninja-dashboard.tar.gz /tmp/ninja-dashboard.tar.gz
+rm -f /tmp/ninja-dashboard.tar.gz
+exec_ct "$CT_ID" "mkdir -p ${DASH_DIR} && \
+  tar -xzf /tmp/ninja-dashboard.tar.gz -C ${DASH_DIR} && \
+  chown -R ${SERVICE_USER}:${SERVICE_USER} ${DASH_DIR} && \
+  rm /tmp/ninja-dashboard.tar.gz"
+log_ok "dist/ deployed to ${DASH_DIR}/dist"
 
-# ── Install deps and build dashboard ─────────────────────────────────────────
-log_info "Installing dependencies..."
-exec_ct "$CT_ID" "cd ${INSTALL_DIR} && sudo -u ${SERVICE_USER} pnpm install --frozen-lockfile"
-log_ok "Dependencies installed"
+# ── Install systemd service ─────────────────────────────────────────────────
+log_info "Installing systemd service..."
+exec_ct "$CT_ID" "cat > /etc/systemd/system/ninja-dashboard.service <<'UNITEOF'
+[Unit]
+Description=ninja-ops Dashboard
+After=network-online.target
+Wants=network-online.target
 
-log_info "Building dashboard..."
-exec_ct "$CT_ID" "cd ${INSTALL_DIR} && \
-  sudo -u ${SERVICE_USER} pnpm --filter @ninja/types build && \
-  VITE_API_URL='' sudo -u ${SERVICE_USER} pnpm --filter @ninja/dashboard build"
-log_ok "Dashboard built"
+[Service]
+Type=simple
+User=${SERVICE_USER}
+WorkingDirectory=${DASH_DIR}
+ExecStart=/usr/local/bin/serve dist --single --listen 0.0.0.0:${SERVE_PORT}
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
 
-# ── Configure Caddy ──────────────────────────────────────────────────────────
-# Proxy paths match vite.config.ts: /api and /ws
-log_info "Writing Caddyfile..."
-exec_ct "$CT_ID" "cat > /etc/caddy/Caddyfile <<'CADDYEOF'
-:${CADDY_PORT} {
-    root * ${INSTALL_DIR}/apps/dashboard/dist
-    file_server
-    try_files {path} /index.html
+[Install]
+WantedBy=multi-user.target
+UNITEOF"
 
-    handle /api/* {
-        reverse_proxy ${CONTROL_PLANE_INTERNAL}
-    }
-
-    handle /ws* {
-        reverse_proxy ${CONTROL_PLANE_INTERNAL}
-    }
-
-    header {
-        X-Content-Type-Options \"nosniff\"
-        X-Frame-Options \"DENY\"
-    }
-
-    @static path *.js *.css *.png *.svg *.ico *.woff *.woff2
-    header @static Cache-Control \"public, max-age=31536000, immutable\"
-}
-CADDYEOF"
-log_ok "Caddyfile written"
-
-log_info "Validating Caddy configuration..."
-exec_ct "$CT_ID" "caddy validate --config /etc/caddy/Caddyfile"
-log_ok "Caddy configuration valid"
-
-log_info "Starting Caddy..."
-exec_ct "$CT_ID" "systemctl restart caddy && systemctl enable caddy"
-log_ok "Caddy is running and enabled"
+exec_ct "$CT_ID" "systemctl daemon-reload && systemctl enable --now ninja-dashboard"
+log_ok "Service installed and started"
 
 # ── Verify ───────────────────────────────────────────────────────────────────
 NET_IP_BARE=$(strip_cidr "$NET_IP")
@@ -282,7 +285,7 @@ NET_IP_BARE=$(strip_cidr "$NET_IP")
 log_info "Verifying dashboard..."
 _dash_ok=0
 for _i in $(seq 1 15); do
-  if exec_ct "$CT_ID" "curl -sf http://localhost:${CADDY_PORT}" >/dev/null 2>&1; then
+  if exec_ct "$CT_ID" "curl -sf http://localhost:${SERVE_PORT}" >/dev/null 2>&1; then
     _dash_ok=1
     break
   fi
@@ -292,7 +295,7 @@ done
 if [ "$_dash_ok" -eq 1 ]; then
   log_ok "Dashboard is responding"
 else
-  log_warn "Dashboard did not respond after 30s — check: pct exec $CT_ID -- journalctl -u caddy -n 50"
+  log_warn "Dashboard did not respond after 30s — check: pct exec $CT_ID -- journalctl -u ninja-dashboard -n 50"
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────
@@ -302,11 +305,11 @@ print_box_title "Dashboard Ready"
 print_box_mid
 print_box_blank
 print_box_kv "Container" "CT $CT_ID ($CT_HOSTNAME)"
-print_box_kv "Dashboard URL" "http://${NET_IP_BARE}:${CADDY_PORT}"
-print_box_kv "API proxy" "/api/* → ${CONTROL_PLANE_INTERNAL}"
-print_box_kv "WS proxy" "/ws* → ${CONTROL_PLANE_INTERNAL}"
+print_box_kv "Dashboard URL" "http://${NET_IP_BARE}:${SERVE_PORT}"
+print_box_kv "API URL (baked in)" "$VITE_API_URL"
 print_box_blank
 print_box_bot
 printf '\n'
 
-log_ok "Done. Dashboard is available at http://${NET_IP_BARE}:${CADDY_PORT}"
+log_ok "Done. Dashboard is available at http://${NET_IP_BARE}:${SERVE_PORT}"
+log_info "To redeploy after a code change, rerun this script — the control plane will not restart."
