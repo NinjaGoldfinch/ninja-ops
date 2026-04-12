@@ -15,6 +15,7 @@ env/*.env.bak
 *.log
 logs/
 !**/routes/logs/
+!**/pages/logs/
 pino-*.log
 
 # Editor
