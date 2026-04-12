@@ -104,8 +104,8 @@ configure_locale_timezone() {  # $1 = CT_ID, $2 = timezone
 prompt_default() {
   local _hint=""
   [ -n "${3:-}" ] && _hint=" ${C_YLW}(e.g. $3)${C_RST}"
-  printf '%s[ninja]%s %s [%s]%s: ' "$C_CYN" "$C_RST" "$1" "$2" "$_hint"
-  read -r REPLY
+  printf '%s[ninja]%s %s [%s]%s: ' "$C_CYN" "$C_RST" "$1" "$2" "$_hint" >/dev/tty
+  read -r REPLY </dev/tty
   [ -z "$REPLY" ] && REPLY="$2"
 }
 
@@ -183,11 +183,11 @@ confirm_settings() {
     return 0
   fi
 
-  printf '%sProceed with these settings? [y/N]:%s ' "$C_YLW" "$C_RST"
-  read -r _confirm
+  printf '%sProceed with these settings? [Y/n]:%s ' "$C_YLW" "$C_RST" >/dev/tty
+  read -r _confirm </dev/tty
   case "$_confirm" in
-    y|Y|yes|YES) return 0 ;;
-    *) die "Aborted by user." ;;
+    n|N|no|NO) die "Aborted by user." ;;
+    *) return 0 ;;
   esac
 }
 

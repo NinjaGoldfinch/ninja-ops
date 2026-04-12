@@ -80,16 +80,16 @@ if [ "${_NINJA_COMMON_LOADED:-}" != "1" ]; then
   prompt_default() {
     local _hint=""
     [ -n "${3:-}" ] && _hint=" ${C_YLW}(e.g. $3)${C_RST}"
-    printf '%s[ninja]%s %s [%s]%s: ' "$C_CYN" "$C_RST" "$1" "$2" "$_hint"
-    read -r REPLY; [ -z "$REPLY" ] && REPLY="$2"
+    printf '%s[ninja]%s %s [%s]%s: ' "$C_CYN" "$C_RST" "$1" "$2" "$_hint" >/dev/tty
+    read -r REPLY </dev/tty; [ -z "$REPLY" ] && REPLY="$2"
   }
   confirm_settings() {
     local _title="$1"; shift; printf '\n'; print_box_top; print_box_title "$_title"; print_box_mid; print_box_blank
     for _kv in "$@"; do print_box_kv "${_kv%%=*}" "${_kv#*=}"; done
     print_box_blank; print_box_bot; printf '\n'
     if [ "${OPT_YES:-0}" -eq 1 ]; then log_info "Proceeding (--yes)"; return 0; fi
-    printf '%sProceed? [y/N]:%s ' "$C_YLW" "$C_RST"; read -r _c
-    case "$_c" in y|Y|yes|YES) return 0 ;; *) die "Aborted." ;; esac
+    printf '%sProceed with these settings? [Y/n]:%s ' "$C_YLW" "$C_RST" >/dev/tty; read -r _c </dev/tty
+    case "$_c" in n|N|no|NO) die "Aborted." ;; *) return 0 ;; esac
   }
 fi
 
