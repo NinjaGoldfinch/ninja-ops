@@ -120,7 +120,7 @@ prompt_default() {
   [ -n "${3:-}" ] && _hint=" ${C_YLW}(e.g. $3)${C_RST}"
   printf '%s[ninja]%s %s [%s]%s: ' "$C_CYN" "$C_RST" "$1" "$2" "$_hint" >/dev/tty
   read -r REPLY </dev/tty
-  [ -z "$REPLY" ] && REPLY="$2"
+  REPLY="${REPLY:-$2}"
 }
 
 # ── Flag parsing ─────────────────────────────────────────────────────────────

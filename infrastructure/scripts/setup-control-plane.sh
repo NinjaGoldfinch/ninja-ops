@@ -91,7 +91,7 @@ if [ "${_NINJA_COMMON_LOADED:-}" != "1" ]; then
     local _hint=""
     [ -n "${3:-}" ] && _hint=" ${C_YLW}(e.g. $3)${C_RST}"
     printf '%s[ninja]%s %s [%s]%s: ' "$C_CYN" "$C_RST" "$1" "$2" "$_hint" >/dev/tty
-    read -r REPLY </dev/tty; [ -z "$REPLY" ] && REPLY="$2"
+    read -r REPLY </dev/tty; REPLY="${REPLY:-$2}"
   }
   confirm_settings() {
     local _title="$1"; shift; printf '\n'; print_box_top; print_box_title "$_title"; print_box_mid; print_box_blank
@@ -160,7 +160,7 @@ for _arg in "$@"; do
 done
 
 # ── Defaults ─────────────────────────────────────────────────────────────────
-CT_ID="${CT_ID:-202}"
+CT_ID="${CT_ID:-102}"
 CT_HOSTNAME="${CT_HOSTNAME:-control-plane-01}"
 CT_STORAGE="${CT_STORAGE:-local-lvm}"
 CT_DISK="${CT_DISK:-8}"

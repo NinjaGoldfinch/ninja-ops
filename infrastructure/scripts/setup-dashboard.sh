@@ -93,7 +93,7 @@ if [ "${_NINJA_COMMON_LOADED:-}" != "1" ]; then
     local _hint=""
     [ -n "${3:-}" ] && _hint=" ${C_YLW}(e.g. $3)${C_RST}"
     printf '%s[ninja]%s %s [%s]%s: ' "$C_CYN" "$C_RST" "$1" "$2" "$_hint" >/dev/tty
-    read -r REPLY </dev/tty; [ -z "$REPLY" ] && REPLY="$2"
+    read -r REPLY </dev/tty; REPLY="${REPLY:-$2}"
   }
   confirm_settings() {
     local _title="$1"; shift; printf '\n'; print_box_top; print_box_title "$_title"; print_box_mid; print_box_blank
@@ -159,7 +159,7 @@ for _arg in "$@"; do
 done
 
 # ── Defaults ─────────────────────────────────────────────────────────────────
-CT_ID="${CT_ID:-203}"
+CT_ID="${CT_ID:-103}"
 CT_HOSTNAME="${CT_HOSTNAME:-dashboard-01}"
 CT_STORAGE="${CT_STORAGE:-local-lvm}"
 CT_DISK="${CT_DISK:-4}"
@@ -172,7 +172,7 @@ NET_BRIDGE="${NET_BRIDGE:-vmbr0}"
 NET_IP="${NET_IP:-10.0.0.21/24}"
 NET_GW="${NET_GW:-10.0.0.1}"
 NET_DNS="${NET_DNS:-1.1.1.1}"
-CT_CP_ID="${CT_CP_ID:-202}"
+CT_CP_ID="${CT_CP_ID:-102}"
 CP_INSTALL_DIR="${CP_INSTALL_DIR:-/opt/ninja-ops}"
 CP_SERVICE_USER="${CP_SERVICE_USER:-ninja}"
 VITE_API_URL="${VITE_API_URL:-http://10.0.0.20:3000}"
