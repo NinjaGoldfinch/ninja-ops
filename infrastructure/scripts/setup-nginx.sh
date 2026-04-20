@@ -257,93 +257,16 @@ log_ok "nginx installed"
 
 # ── Write nginx config ────────────────────────────────────────────────────────
 log_info "Writing nginx config..."
-exec_ct "$CT_ID" "cat > /etc/nginx/sites-available/ninja-ops.conf <<'NGINXEOF'
-upstream control-plane {
-    server ${CP_IP}:${CP_PORT};
-}
+_RAW_URL="https://raw.githubusercontent.com/NinjaGoldfinch/ninja-ops/main"
+_CONF_URL="${_RAW_URL}/infrastructure/nginx/ninja-ops.conf"
 
-upstream dashboard {
-    server ${DASH_IP}:${DASH_PORT};
-}
-
-server {
-    listen 80;
-    server_name ${NGINX_DOMAIN};
-
-    # Security headers
-    add_header X-Frame-Options DENY always;
-    add_header X-Content-Type-Options nosniff always;
-    add_header Referrer-Policy strict-origin-when-cross-origin always;
-
-    # --- API routes (REST) ---
-    location /api/ {
-        proxy_pass http://control-plane;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_read_timeout 120s;
-        proxy_send_timeout 120s;
-    }
-
-    # --- Health check passthrough ---
-    location = /healthz {
-        proxy_pass http://control-plane;
-        proxy_set_header Host \$host;
-    }
-
-    # --- WebSocket: browser ---
-    location = /ws {
-        proxy_pass http://control-plane;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection \"upgrade\";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_read_timeout 86400s;
-        proxy_send_timeout 86400s;
-    }
-
-    # --- WebSocket: deploy agent ---
-    location = /ws/agent {
-        proxy_pass http://control-plane;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection \"upgrade\";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_read_timeout 86400s;
-        proxy_send_timeout 86400s;
-    }
-
-    # --- WebSocket: log agent ---
-    location = /ws/log-agent {
-        proxy_pass http://control-plane;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection \"upgrade\";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_read_timeout 86400s;
-        proxy_send_timeout 86400s;
-    }
-
-    # --- Dashboard (everything else) ---
-    location / {
-        proxy_pass http://dashboard;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-}
-NGINXEOF"
+# Fetch the config from GitHub and substitute upstream IPs/ports + server_name
+exec_ct "$CT_ID" "curl -sSfL '${_CONF_URL}' \
+  | sed \
+      -e 's|server 10\.0\.0\.20:3000;|server ${CP_IP}:${CP_PORT};|' \
+      -e 's|server 10\.0\.0\.21:8080;|server ${DASH_IP}:${DASH_PORT};|' \
+      -e 's|server_name _;|server_name ${NGINX_DOMAIN};|' \
+  > /etc/nginx/sites-available/ninja-ops.conf"
 log_ok "nginx config written"
 
 # ── Enable site ───────────────────────────────────────────────────────────────

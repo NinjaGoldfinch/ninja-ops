@@ -269,10 +269,15 @@ pct exec 103 -- bash -c "
 
 ### Nginx
 
-After editing `/etc/nginx/sites-available/ninja-ops.conf` on CT 104:
+Edit `infrastructure/nginx/ninja-ops.conf` in the repo, push, then pull it into the container:
 
 ```bash
-pct exec 104 -- nginx -t && pct exec 104 -- systemctl reload nginx
+RAW="https://raw.githubusercontent.com/NinjaGoldfinch/ninja-ops/main"
+pct exec 104 -- bash -c "
+  curl -sSfL '${RAW}/infrastructure/nginx/ninja-ops.conf' \
+    -o /etc/nginx/sites-available/ninja-ops.conf && \
+  nginx -t && systemctl reload nginx
+"
 ```
 
 ---
