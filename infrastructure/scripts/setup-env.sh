@@ -91,8 +91,12 @@ else
   PG_PASSWORD="$REPLY"
 fi
 
-prompt_secret "Redis password (blank = no auth)"
-REDIS_PASSWORD="$REPLY"
+prompt_secret "Redis password (blank = auto-generate)"
+if [ -z "$REPLY" ]; then
+  REDIS_PASSWORD=$(gen_secret 16)
+else
+  REDIS_PASSWORD="$REPLY"
+fi
 
 JWT_SECRET=$(gen_secret 64)
 ENCRYPTION_KEY=$(gen_secret 32)
