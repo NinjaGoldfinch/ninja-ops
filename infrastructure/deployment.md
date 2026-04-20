@@ -284,34 +284,43 @@ pct exec 104 -- bash -c "
 
 ## Exposing Nginx Publicly
 
-Nginx sits on the private `10.0.0.22` network. To give it a public address, add iptables DNAT rules on the **Proxmox host** to forward port 80 from your public IP to the nginx container.
+Nginx sits on the private `10.0.0.22` network. Run this on the **Proxmox host** to forward port 80 from your LAN IP to the nginx container. The script auto-detects the interface and IP, and is idempotent — safe to re-run.
 
 ```bash
-# Set these to match your environment
-PUBLIC_IP="203.0.113.10"   # your Proxmox host's public IP
-PUBLIC_IFACE="eth0"        # public-facing interface (check with: ip -br addr)
+# Auto-detect the public-facing interface and its IP
+PUBLIC_IFACE=$(ip route show default | awk '{print $5; exit}')
+PUBLIC_IP=$(ip -4 addr show "$PUBLIC_IFACE" | awk '/inet / {print $2; exit}' | cut -d/ -f1)
 
-# Forward port 80 inbound to nginx
-iptables -t nat -A PREROUTING  -d "$PUBLIC_IP" -p tcp --dport 80 -j DNAT --to-destination 10.0.0.22:80
+echo "Interface : $PUBLIC_IFACE"
+echo "IP        : $PUBLIC_IP"
+
+# Remove any existing rules for this destination (idempotent)
+iptables-save | grep -- '--dport 80 -j DNAT --to-destination 10.0.0.22:80' \
+  | sed 's/^-A/-D/' | while IFS= read -r rule; do
+    iptables -t nat $rule 2>/dev/null || true
+  done
+iptables -D FORWARD -p tcp -d 10.0.0.22 --dport 80 \
+  -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || true
+iptables -t nat -D POSTROUTING -s 10.0.0.0/24 -o "$PUBLIC_IFACE" -j MASQUERADE 2>/dev/null || true
+
+# Add rules
+iptables -t nat -A PREROUTING -d "$PUBLIC_IP" -p tcp --dport 80 -j DNAT --to-destination 10.0.0.22:80
 iptables -A FORWARD -p tcp -d 10.0.0.22 --dport 80 -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
-
-# Masquerade so nginx sees return path correctly
 iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -o "$PUBLIC_IFACE" -j MASQUERADE
 
 # Persist across reboots
 apt-get install -y iptables-persistent
 netfilter-persistent save
+
+echo "Done. Verify with: curl -I http://${PUBLIC_IP}/healthz"
 ```
 
-To verify:
+To remove the rules:
 ```bash
-iptables -t nat -L PREROUTING -n --line-numbers   # should show the DNAT rule
-curl -I http://$PUBLIC_IP/healthz
-```
+PUBLIC_IFACE=$(ip route show default | awk '{print $5; exit}')
+PUBLIC_IP=$(ip -4 addr show "$PUBLIC_IFACE" | awk '/inet / {print $2; exit}' | cut -d/ -f1)
 
-To remove the rules later:
-```bash
-iptables -t nat -D PREROUTING  -d "$PUBLIC_IP" -p tcp --dport 80 -j DNAT --to-destination 10.0.0.22:80
+iptables -t nat -D PREROUTING -d "$PUBLIC_IP" -p tcp --dport 80 -j DNAT --to-destination 10.0.0.22:80
 iptables -D FORWARD -p tcp -d 10.0.0.22 --dport 80 -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
 iptables -t nat -D POSTROUTING -s 10.0.0.0/24 -o "$PUBLIC_IFACE" -j MASQUERADE
 netfilter-persistent save
