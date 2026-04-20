@@ -265,7 +265,7 @@ exec_ct "$CT_ID" "curl -sSfL '${_CONF_URL}' \
   | sed \
       -e 's|server 10\.0\.0\.20:3000;|server ${CP_IP}:${CP_PORT};|' \
       -e 's|server 10\.0\.0\.21:8080;|server ${DASH_IP}:${DASH_PORT};|' \
-      -e 's|server_name _;|server_name ${NGINX_DOMAIN};|' \
+      -e 's|server_name _;|server_name ${NGINX_DOMAIN} _;|' \
   > /etc/nginx/sites-available/ninja-ops.conf"
 log_ok "nginx config written"
 
