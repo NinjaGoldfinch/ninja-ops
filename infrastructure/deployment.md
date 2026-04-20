@@ -332,6 +332,10 @@ netfilter-persistent save
 
 ## Troubleshooting
 
+> **Note:** `pct exec` commands must be run on the **Proxmox host**. If you are already inside a container, use the direct commands in the second block below.
+
+### From the Proxmox host
+
 ```bash
 # Service logs
 pct exec 102 -- journalctl -u ninja-control-plane -f
@@ -341,21 +345,47 @@ pct exec 101 -- journalctl -u redis-server -f
 pct exec 104 -- journalctl -u nginx -f
 pct exec 104 -- tail -f /var/log/nginx/error.log
 
-# Open a shell
+# Open a shell in any container
 pct exec 102 -- bash
 
-# Test database from control plane
+# Test database
 pct exec 102 -- bash -c "
   psql \$(grep DATABASE_URL /etc/ninja-ops/control-plane.env | cut -d= -f2-) -c 'SELECT 1'
 "
 
-# Test Redis from control plane
+# Test Redis
 pct exec 102 -- redis-cli -h 10.0.0.11 ping
 
-# Health checks from host
+# Health checks
 curl http://10.0.0.20:3000/healthz
 curl -I http://10.0.0.21:8080
 curl http://10.0.0.22/healthz
+```
+
+### From inside a container
+
+```bash
+# Control plane (CT 102)
+journalctl -u ninja-control-plane -f
+curl http://localhost:3000/healthz
+psql "$(grep DATABASE_URL /etc/ninja-ops/control-plane.env | cut -d= -f2-)" -c 'SELECT 1'
+redis-cli -h 10.0.0.11 ping
+
+# Dashboard (CT 103)
+journalctl -u ninja-dashboard -f
+curl http://localhost:8080
+
+# Nginx (CT 104)
+journalctl -u nginx -f
+tail -f /var/log/nginx/error.log
+nginx -T                          # dump full running config
+curl http://localhost/healthz     # test proxy to control plane
+
+# PostgreSQL (CT 100)
+journalctl -u postgresql -f
+
+# Redis (CT 101)
+journalctl -u redis-server -f
 ```
 
 ---
