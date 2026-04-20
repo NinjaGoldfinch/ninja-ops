@@ -282,6 +282,45 @@ pct exec 104 -- bash -c "
 
 ---
 
+## Exposing Nginx Publicly
+
+Nginx sits on the private `10.0.0.22` network. To give it a public address, add iptables DNAT rules on the **Proxmox host** to forward port 80 from your public IP to the nginx container.
+
+```bash
+# Set these to match your environment
+PUBLIC_IP="203.0.113.10"   # your Proxmox host's public IP
+PUBLIC_IFACE="eth0"        # public-facing interface (check with: ip -br addr)
+
+# Forward port 80 inbound to nginx
+iptables -t nat -A PREROUTING  -d "$PUBLIC_IP" -p tcp --dport 80 -j DNAT --to-destination 10.0.0.22:80
+iptables -A FORWARD -p tcp -d 10.0.0.22 --dport 80 -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+
+# Masquerade so nginx sees return path correctly
+iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -o "$PUBLIC_IFACE" -j MASQUERADE
+
+# Persist across reboots
+apt-get install -y iptables-persistent
+netfilter-persistent save
+```
+
+To verify:
+```bash
+iptables -t nat -L PREROUTING -n --line-numbers   # should show the DNAT rule
+curl -I http://$PUBLIC_IP/healthz
+```
+
+To remove the rules later:
+```bash
+iptables -t nat -D PREROUTING  -d "$PUBLIC_IP" -p tcp --dport 80 -j DNAT --to-destination 10.0.0.22:80
+iptables -D FORWARD -p tcp -d 10.0.0.22 --dport 80 -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+iptables -t nat -D POSTROUTING -s 10.0.0.0/24 -o "$PUBLIC_IFACE" -j MASQUERADE
+netfilter-persistent save
+```
+
+> **TLS:** When adding HTTPS later, forward port 443 the same way and run certbot inside CT 104. The nginx config's `server_name _` becomes your real domain, and `listen 443 ssl` is added alongside `listen 80`.
+
+---
+
 ## Troubleshooting
 
 ```bash
