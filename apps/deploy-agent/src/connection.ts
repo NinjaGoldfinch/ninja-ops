@@ -14,12 +14,18 @@ export function setCurrentJobId(id: string | null): void {
 
 let ws: WebSocket | null = null
 let onCommandCallback: ((cmd: AgentCommand) => void) | null = null
+let reregisterFn: (() => Promise<{ agentId: string; token: string }>) | null = null
 let agentIdRef = ''
 let tokenRef = ''
 let reconnectScheduled = false
+let needsReregister = false
 
 export function setOnCommand(cb: (cmd: AgentCommand) => void): void {
   onCommandCallback = cb
+}
+
+export function setReregister(fn: () => Promise<{ agentId: string; token: string }>): void {
+  reregisterFn = fn
 }
 
 export function send(msg: AgentClientMessage): void {
@@ -41,6 +47,18 @@ function scheduleReconnect(): void {
   reconnectScheduled = true
   setTimeout(() => {
     reconnectScheduled = false
+    if (needsReregister && reregisterFn !== null) {
+      needsReregister = false
+      log.info('Re-registering with control plane to obtain fresh token')
+      reregisterFn().then(({ agentId, token }) => {
+        startConnection(agentId, token)
+      }).catch((err: Error) => {
+        log.warn('Re-registration failed, retrying', { error: err.message })
+        needsReregister = true
+        scheduleReconnect()
+      })
+      return
+    }
     startConnection(agentIdRef, tokenRef)
   }, config.RECONNECT_DELAY_MS)
 }
@@ -99,6 +117,9 @@ export function startConnection(agentId: string, token: string): void {
 
     if (parsed.type === 'error') {
       log.warn('Received error from server', { code: parsed.code, message: parsed.message })
+      if (parsed.code === 'UNAUTHORIZED') {
+        needsReregister = true
+      }
     }
   })
 

@@ -1,7 +1,7 @@
 import './config.js'
 import { log } from './logger.js'
 import { register } from './register.js'
-import { startConnection, closeConnection, setOnCommand } from './connection.js'
+import { startConnection, closeConnection, setOnCommand, setReregister } from './connection.js'
 import { handleCommand, cancelActiveDeploy } from './runner.js'
 
 log.info('Starting deploy-agent')
@@ -10,6 +10,7 @@ const { agentId, token } = await register()
 log.info('Registered with control plane', { agentId })
 
 setOnCommand((cmd) => handleCommand(cmd, agentId))
+setReregister(register)
 startConnection(agentId, token)
 
 function shutdown(signal: string): void {
