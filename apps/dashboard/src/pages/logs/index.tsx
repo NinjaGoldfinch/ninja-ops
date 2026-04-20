@@ -317,8 +317,11 @@ function LogRow({ entry, style }: { entry: LogEntryRow; style: React.CSSProperti
         className={`border-l-2 ${borderColor} flex items-start gap-2 font-mono text-xs py-0.5 px-2 hover:bg-zinc-800/40 cursor-pointer`}
         onClick={() => setExpanded((e) => !e)}
       >
-        <span className="text-zinc-600 shrink-0 w-32 select-none">
-          {new Date(entry.ts).toLocaleString()}
+        <span className="text-zinc-600 shrink-0 w-36 select-none whitespace-nowrap">
+          {new Date(entry.ts).toLocaleString(undefined, {
+            month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+          })}
         </span>
         <span className="text-zinc-600 shrink-0 w-10">{entry.vmid}</span>
         <span className="text-zinc-500 shrink-0 w-16 truncate">{entry.source}</span>
@@ -703,7 +706,7 @@ function LogsPage() {
           {/* Log table */}
           <div className="rounded-md border border-zinc-800 overflow-hidden">
             <div className="flex items-center gap-2 px-2 py-1 bg-zinc-900 border-b border-zinc-800 font-mono text-xs text-zinc-600">
-              <span className="w-32">timestamp</span>
+              <span className="w-36">timestamp</span>
               <span className="w-10">vmid</span>
               <span className="w-16">source</span>
               <span className="w-20">unit</span>
