@@ -2,8 +2,10 @@ import WebSocket from 'ws'
 import type { AgentClientMessage, AgentCommand, AgentServerMessage } from '@ninja/types'
 import { AgentServerMessageSchema } from '@ninja/types'
 import { config } from './config.js'
-import { log } from './logger.js'
+import { log as rootLog } from './logger.js'
 import { startHeartbeat, stopHeartbeat } from './heartbeat.js'
+
+const log = rootLog.child({ component: 'ws' })
 
 // Mutable state shared with heartbeat and runner
 export let currentJobId: string | null = null

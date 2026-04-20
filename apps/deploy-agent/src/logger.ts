@@ -22,10 +22,31 @@ function write(level: LogLevel, msg: string, data?: Record<string, unknown>): vo
   }
 }
 
-export const log = {
-  trace: (msg: string, data?: Record<string, unknown>) => write('trace', msg, data),
-  debug: (msg: string, data?: Record<string, unknown>) => write('debug', msg, data),
-  info: (msg: string, data?: Record<string, unknown>) => write('info', msg, data),
-  warn: (msg: string, data?: Record<string, unknown>) => write('warn', msg, data),
-  error: (msg: string, data?: Record<string, unknown>) => write('error', msg, data),
+export interface Logger {
+  trace: (msg: string, data?: Record<string, unknown>) => void
+  debug: (msg: string, data?: Record<string, unknown>) => void
+  info:  (msg: string, data?: Record<string, unknown>) => void
+  warn:  (msg: string, data?: Record<string, unknown>) => void
+  error: (msg: string, data?: Record<string, unknown>) => void
+  child: (bindings: Record<string, unknown>) => Logger
+}
+
+function createChild(bindings: Record<string, unknown>): Logger {
+  return {
+    trace: (msg, data) => write('trace', msg, { ...bindings, ...data }),
+    debug: (msg, data) => write('debug', msg, { ...bindings, ...data }),
+    info:  (msg, data) => write('info',  msg, { ...bindings, ...data }),
+    warn:  (msg, data) => write('warn',  msg, { ...bindings, ...data }),
+    error: (msg, data) => write('error', msg, { ...bindings, ...data }),
+    child: (extra) => createChild({ ...bindings, ...extra }),
+  }
+}
+
+export const log: Logger = {
+  trace: (msg, data) => write('trace', msg, data),
+  debug: (msg, data) => write('debug', msg, data),
+  info:  (msg, data) => write('info',  msg, data),
+  warn:  (msg, data) => write('warn',  msg, data),
+  error: (msg, data) => write('error', msg, data),
+  child: (bindings) => createChild(bindings),
 }

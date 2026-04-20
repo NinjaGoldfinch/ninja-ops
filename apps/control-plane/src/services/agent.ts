@@ -1,8 +1,11 @@
 import { sql } from '../db/client.js'
+import { childLogger } from '../lib/logger.js'
 import { signToken } from '../plugins/auth.js'
 import { AppError } from '../errors.js'
 import { config } from '../config.js'
 import { sessionManager } from '../ws/session.js'
+
+const log = childLogger('agent')
 import type { Agent, AgentRegisterRequest, AgentRegisterResponse, AgentHeartbeat, AgentCommand, LogAgentRegisterRequest, LogAgentRegisterResponse } from '@ninja/types'
 import type { WebSocket } from '@fastify/websocket'
 
@@ -79,7 +82,7 @@ export class AgentService {
     `.then(rows => {
       if (rows[0]) sessionManager.broadcastAgentStatus(toAgent(rows[0]))
     }).catch(
-      (err: Error) => console.error('[agent] Failed to mark connected:', err.message),
+      (err: Error) => log.error({ agentId, err }, 'Failed to mark agent connected'),
     )
   }
 
@@ -92,7 +95,7 @@ export class AgentService {
     `.then(rows => {
       if (rows[0]) sessionManager.broadcastAgentStatus(toAgent(rows[0]))
     }).catch(
-      (err: Error) => console.error('[agent] Failed to mark disconnected:', err.message),
+      (err: Error) => log.error({ agentId, err }, 'Failed to mark agent disconnected'),
     )
   }
 

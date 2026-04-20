@@ -1,5 +1,8 @@
 import { sql } from '../db/client.js'
+import { childLogger } from '../lib/logger.js'
 import type { AuditAction, AuditLogEntry, PaginationQuery } from '@ninja/types'
+
+const log = childLogger('audit')
 
 interface LogParams {
   userId?: string | null
@@ -53,7 +56,7 @@ export class AuditService {
         ${ip ?? null}
       )
     `.catch((err: Error) => {
-      console.error('[audit] Failed to write audit log entry:', err.message)
+      log.error({ err, action }, 'Failed to write audit log entry')
     })
   }
 

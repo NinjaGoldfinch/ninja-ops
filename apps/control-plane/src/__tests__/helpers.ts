@@ -1,6 +1,7 @@
 import { SignJWT } from 'jose'
-import type { FastifyInstance } from 'fastify'
 import { buildApp } from '../app.js'
+
+export type TestApp = Awaited<ReturnType<typeof buildApp>>
 
 // Sign tokens using the same algorithm and secret the app uses, but directly
 // via jose — avoiding potential module-isolation issues with plugins/auth.ts.
@@ -21,7 +22,7 @@ export async function makeToken(
     .sign(getSecret())
 }
 
-export async function makeApp(): Promise<FastifyInstance> {
+export async function makeApp() {
   return buildApp()
 }
 

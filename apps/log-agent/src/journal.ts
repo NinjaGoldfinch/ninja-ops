@@ -2,7 +2,9 @@ import { spawn } from 'node:child_process'
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { priorityToLevel } from './priority.js'
 import { config } from './config.js'
-import { log } from './logger.js'
+import { log as rootLog } from './logger.js'
+
+const log = rootLog.child({ component: 'journal' })
 
 const CURSOR_FILE = '/opt/ninja-log-agent/cursor'
 
@@ -23,7 +25,7 @@ function loadCursor(): string | undefined {
       return readFileSync(CURSOR_FILE, 'utf8').trim() || undefined
     }
   } catch {
-    // Cursor file unreadable — start from now
+    log.debug('Cursor file unreadable, starting from now')
   }
   return undefined
 }
@@ -32,7 +34,7 @@ function saveCursor(cursor: string): void {
   try {
     writeFileSync(CURSOR_FILE, cursor, 'utf8')
   } catch {
-    // Non-fatal — worst case we re-send a few lines on restart
+    log.debug('Failed to write cursor file')
   }
 }
 
@@ -81,7 +83,7 @@ function tailUnits(units: string[], onLine: LineHandler): () => void {
 
         if (entry['__CURSOR']) saveCursor(entry['__CURSOR'])
       } catch {
-        // Malformed JSON — journald can emit partial lines on startup
+        log.debug('Malformed journal JSON line')
       }
     }
   })

@@ -1,8 +1,11 @@
 import { networkInterfaces } from 'os'
 import { proxmoxService } from './proxmox.js'
+import { childLogger } from '../lib/logger.js'
 import { config } from '../config.js'
 import { AppError } from '../errors.js'
 import { JobLogger } from './job-logger.js'
+
+const agentDeployerLog = childLogger('agent-deployer')
 
 function resolveControlPlaneUrl(): string {
   if (config.CONTROL_PLANE_URL) return config.CONTROL_PLANE_URL
@@ -42,8 +45,8 @@ async function exec(
   logger?: JobLogger,
 ): Promise<void> {
   const tag = `[agent-deployer] [${description}]`
-  const logInfo = (msg: string) => logger ? logger.info(msg) : console.log(msg)
-  const logError = (msg: string) => logger ? logger.error(msg) : console.error(msg)
+  const logInfo = (msg: string) => logger ? logger.info(msg) : agentDeployerLog.info(msg)
+  const logError = (msg: string) => logger ? logger.error(msg) : agentDeployerLog.error(msg)
 
   logInfo(`${tag} start: pct exec ${vmid} -- ${command.join(' ')}`)
   try {

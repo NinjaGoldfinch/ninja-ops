@@ -1,9 +1,12 @@
 import { Queue, Worker } from 'bullmq'
 import { bullmqConnection } from '../db/redis.js'
+import { childLogger } from '../lib/logger.js'
+import { config } from '../config.js'
 import { logService } from '../services/log.js'
 
-const QUEUE_NAME     = 'log-purge'
-const RETENTION_DAYS = 30
+const log = childLogger('log-purge')
+
+const QUEUE_NAME = 'log-purge'
 
 let purgeQueue:  Queue  | null = null
 let purgeWorker: Worker | null = null
@@ -20,12 +23,12 @@ export async function startLogPurgeWorker(): Promise<void> {
   })
 
   purgeWorker = new Worker(QUEUE_NAME, async () => {
-    const deleted = await logService.purgeOlderThan(RETENTION_DAYS)
-    console.info(`[log-purge] Deleted ${deleted} entries older than ${RETENTION_DAYS} days`)
+    const deleted = await logService.purgeOlderThan(config.LOG_RETENTION_DAYS)
+    log.info({ deleted, retentionDays: config.LOG_RETENTION_DAYS }, 'Purged old log entries')
   }, { connection: bullmqConnection })
 
   purgeWorker.on('failed', (job, err) => {
-    console.error(`[log-purge] Job ${job?.id ?? 'unknown'} failed:`, err.message)
+    log.error({ bullmqJobId: job?.id ?? 'unknown', err }, 'Log purge job failed')
   })
 }
 

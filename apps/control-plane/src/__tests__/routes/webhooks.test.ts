@@ -1,5 +1,5 @@
 import { vi, describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
-import type { FastifyInstance } from 'fastify'
+import type { TestApp } from '../helpers.js'
 import { makeApp } from '../helpers.js'
 import { AppError } from '../../errors.js'
 
@@ -29,7 +29,7 @@ const VALID_PAYLOAD = JSON.stringify({
   },
 })
 
-let app: FastifyInstance
+let app: TestApp
 
 beforeAll(async () => {
   app = await makeApp()

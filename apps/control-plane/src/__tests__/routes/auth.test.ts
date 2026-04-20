@@ -1,5 +1,5 @@
 import { vi, describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
-import type { FastifyInstance } from 'fastify'
+import type { TestApp } from '../helpers.js'
 import { makeApp, makeToken, authHeader } from '../helpers.js'
 import { AppError } from '../../errors.js'
 
@@ -15,7 +15,7 @@ import { authService } from '../../services/auth.js'
 const loginMock = vi.mocked(authService.login)
 const changePwdMock = vi.mocked(authService.changePassword)
 
-let app: FastifyInstance
+let app: TestApp
 
 beforeAll(async () => {
   app = await makeApp()

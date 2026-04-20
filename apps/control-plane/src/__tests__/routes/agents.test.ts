@@ -1,5 +1,5 @@
 import { vi, describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
-import type { FastifyInstance } from 'fastify'
+import type { TestApp } from '../helpers.js'
 import { makeApp, makeToken, authHeader } from '../helpers.js'
 import { AppError } from '../../errors.js'
 
@@ -32,7 +32,7 @@ const mockAgent = {
   registeredAt: '2024-01-01T00:00:00.000Z',
 }
 
-let app: FastifyInstance
+let app: TestApp
 let adminToken: string
 let operatorToken: string
 let viewerToken: string

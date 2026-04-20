@@ -7,14 +7,16 @@ import { deployService } from '../services/deploy.js'
 import { sessionManager } from './session.js'
 
 export const registerAgentWebSocket = fp(async function agentWsPlugin(app: FastifyInstance) {
-  // @fastify/websocket is already registered by the browser WS router.
-  // Just add the route:
+  const log = app.log.child({ component: 'ws:agent' })
 
   app.get('/ws/agent', { websocket: true }, (socket, _req) => {
     let agentId: string | null = null
 
+    log.debug('Agent WebSocket connection opened')
+
     const authTimer = setTimeout(() => {
       if (!agentId) {
+        log.warn('Agent auth timeout, closing connection')
         socket.send(JSON.stringify({ type: 'error', code: 'UNAUTHORIZED', message: 'Authentication timeout' }))
         socket.close(1008, 'Unauthorized')
       }
@@ -25,12 +27,14 @@ export const registerAgentWebSocket = fp(async function agentWsPlugin(app: Fasti
       try {
         parsed = JSON.parse(raw.toString())
       } catch {
+        log.debug('Invalid JSON from agent connection')
         socket.send(JSON.stringify({ type: 'error', code: 'PARSE_ERROR', message: 'Invalid JSON' }))
         return
       }
 
       const result = AgentClientMessageSchema.safeParse(parsed)
       if (!result.success) {
+        log.debug({ issues: result.error.issues }, 'Unknown agent message type')
         socket.send(JSON.stringify({ type: 'error', code: 'VALIDATION_ERROR', message: 'Unknown message type' }))
         return
       }
@@ -47,8 +51,10 @@ export const registerAgentWebSocket = fp(async function agentWsPlugin(app: Fasti
             agentId = msg.agentId
             clearTimeout(authTimer)
             agentService.markConnected(agentId, socket)
+            log.info({ agentId }, 'Agent authenticated')
             socket.send(JSON.stringify({ type: 'auth_ok' }))
           } catch {
+            log.warn({ agentId: msg.agentId }, 'Agent auth failed')
             socket.send(JSON.stringify({ type: 'error', code: 'UNAUTHORIZED', message: 'Invalid token' }))
             socket.close(1008, 'Unauthorized')
           }
@@ -70,6 +76,7 @@ export const registerAgentWebSocket = fp(async function agentWsPlugin(app: Fasti
         const result = msg.payload
         switch (result.type) {
           case 'deploy_started':
+            log.debug({ agentId, jobId: result.jobId }, 'Deploy started')
             void deployService.transitionState(result.jobId, 'running', { agentId: result.agentId })
             void deployService.getJob(result.jobId).then(job => {
               sessionManager.broadcastDeployUpdate(result.jobId, job)
@@ -93,13 +100,13 @@ export const registerAgentWebSocket = fp(async function agentWsPlugin(app: Fasti
 
           case 'deploy_finished': {
             const finalState = result.exitCode === 0 ? 'success' : 'failed'
+            log.info({ agentId, jobId: result.jobId, exitCode: result.exitCode, finalState }, 'Deploy finished')
             void deployService.transitionState(result.jobId, finalState, {
               exitCode: result.exitCode,
             })
             void deployService.getJob(result.jobId).then(job => {
               sessionManager.broadcastDeployUpdate(result.jobId, job)
             })
-            // Mark agent as idle
             if (agentId) {
               void agentService.handleHeartbeat({
                 agentId,
@@ -112,7 +119,6 @@ export const registerAgentWebSocket = fp(async function agentWsPlugin(app: Fasti
           }
 
           case 'pong':
-            // Heartbeat response — no action needed
             break
         }
       }
@@ -121,6 +127,7 @@ export const registerAgentWebSocket = fp(async function agentWsPlugin(app: Fasti
     socket.on('close', () => {
       clearTimeout(authTimer)
       if (agentId) {
+        log.info({ agentId }, 'Agent WebSocket disconnected')
         agentService.markDisconnected(agentId)
       }
     })

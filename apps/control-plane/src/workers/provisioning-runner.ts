@@ -1,6 +1,9 @@
 import { Queue, Worker } from 'bullmq'
 import { bullmqConnection } from '../db/redis.js'
+import { childLogger } from '../lib/logger.js'
 import { sql } from '../db/client.js'
+
+const log = childLogger('provisioning-runner')
 import { proxmoxService } from '../services/proxmox.js'
 import { nodeService } from '../services/node.js'
 import { deployAgentIntoLxc, deployLogAgentIntoLxc } from '../services/agent-deployer.js'
@@ -184,7 +187,7 @@ export async function startProvisioningWorker(): Promise<void> {
   )
 
   provisioningWorker.on('failed', (job, err) => {
-    console.error(`[provisioning-runner] Job ${job?.id ?? 'unknown'} failed:`, err.message)
+    log.error({ bullmqJobId: job?.id ?? 'unknown', err }, 'Provisioning job failed')
   })
 }
 

@@ -1,7 +1,10 @@
 import { Writable } from 'node:stream'
 import { sql } from '../db/client.js'
+import { childLogger } from '../lib/logger.js'
 import { sessionManager } from '../ws/session.js'
 import { AppError } from '../errors.js'
+
+const log = childLogger('log-service')
 import type { LogAgentClientMessage, LogQueryParams, LogEntryRow, LogStatsParams, LogStatsResponse } from '@ninja/types'
 
 interface DbLogEntry {
@@ -41,7 +44,7 @@ export class LogService {
         ${msg.unit ?? null}, ${msg.level}, ${msg.line}, ${msg.ts}
       )
     `.catch((err: Error) => {
-      console.error('[log-service] Failed to persist log entry:', err.message)
+      log.error({ err, vmid: msg.vmid }, 'Failed to persist log entry')
     })
 
     // Broadcast to subscribed dashboard clients

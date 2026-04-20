@@ -1,6 +1,9 @@
 import { Queue, Worker } from 'bullmq'
 import { bullmqConnection } from '../db/redis.js'
+import { childLogger } from '../lib/logger.js'
 import { sql } from '../db/client.js'
+
+const log = childLogger('metrics-poller')
 import { proxmoxService } from '../services/proxmox.js'
 import { cryptoService } from '../services/crypto.js'
 import { sessionManager } from '../ws/session.js'
@@ -49,7 +52,7 @@ async function pollMetrics(): Promise<void> {
           sessionManager.broadcastGuestMetrics(node.id, guestMetrics.vmid, guestMetrics)
         }
       } catch (err) {
-        console.error(`[metrics-poller] Failed to poll node ${node.id}:`, (err as Error).message)
+        log.error({ nodeId: node.id, err: err as Error }, 'Failed to poll node')
       }
     }),
   )
@@ -80,7 +83,7 @@ export async function startWorkers(): Promise<void> {
   )
 
   metricsWorker.on('failed', (job, err) => {
-    console.error(`[metrics-poller] Job ${job?.id ?? 'unknown'} failed:`, err.message)
+    log.error({ bullmqJobId: job?.id ?? 'unknown', err }, 'Metrics poll job failed')
   })
 }
 

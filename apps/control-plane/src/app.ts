@@ -1,5 +1,7 @@
+import { randomUUID } from 'node:crypto'
 import Fastify, { type FastifyError } from 'fastify'
 import { config } from './config.js'
+import { logger } from './lib/logger.js'
 import { AppError } from './errors.js'
 import type { ApiError } from '@ninja/types'
 
@@ -26,12 +28,13 @@ import { registerLogAgentWebSocket } from './ws/log-agent-router.js'
 
 export async function buildApp() {
   const app = Fastify({
-    logger: {
-      level: config.LOG_LEVEL,
-      ...(config.NODE_ENV === 'development'
-        ? { transport: { target: 'pino-pretty' } }
-        : {}),
-    },
+    loggerInstance: logger,
+    genReqId: (req) => (req.headers['x-request-id'] as string) ?? randomUUID(),
+  })
+
+  // Echo request ID back in response headers
+  app.addHook('onSend', async (request, reply) => {
+    void reply.header('x-request-id', request.id)
   })
 
   // Preserve raw body for HMAC verification on webhook routes

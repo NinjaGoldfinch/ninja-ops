@@ -1,6 +1,9 @@
 import { Queue, Worker } from 'bullmq'
 import { bullmqConnection } from '../db/redis.js'
+import { childLogger } from '../lib/logger.js'
 import { deployService } from '../services/deploy.js'
+
+const log = childLogger('deploy-runner')
 import { agentService } from '../services/agent.js'
 import { sessionManager } from '../ws/session.js'
 
@@ -71,7 +74,7 @@ export async function startDeployWorker(): Promise<void> {
   )
 
   deployWorker.on('failed', (job, err) => {
-    console.error(`[deploy-runner] Job ${job?.id ?? 'unknown'} failed:`, err.message)
+    log.error({ bullmqJobId: job?.id ?? 'unknown', err }, 'Deploy job failed')
   })
 }
 

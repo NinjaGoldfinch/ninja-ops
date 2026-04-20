@@ -2,9 +2,11 @@ import WebSocket from 'ws'
 import type { LogAgentClientMessage } from '@ninja/types'
 import { LogAgentServerMessageSchema } from '@ninja/types'
 import { config } from './config.js'
-import { log } from './logger.js'
+import { log as rootLog } from './logger.js'
 import { startJournal } from './journal.js'
 import { startHeartbeat, stopHeartbeat } from './heartbeat.js'
+
+const log = rootLog.child({ component: 'ws' })
 
 let ws: WebSocket | null = null
 let agentIdRef = ''
@@ -56,11 +58,15 @@ export function startConnection(agentId: string, token: string): void {
     try {
       parsed = JSON.parse(raw.toString())
     } catch {
+      log.debug('Failed to parse server message as JSON')
       return
     }
 
     const result = LogAgentServerMessageSchema.safeParse(parsed)
-    if (!result.success) return
+    if (!result.success) {
+      log.debug('Invalid server message', { issues: result.error.issues })
+      return
+    }
     const msg = result.data
 
     if (msg.type === 'auth_ok') {

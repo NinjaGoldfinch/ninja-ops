@@ -19,6 +19,8 @@ import { setLogBroadcaster, getLogBuffer } from '../lib/log-interceptor.js'
 const AUTH_TIMEOUT_MS = 10_000
 
 export const registerWebSocket = fp(async function wsPlugin(app: FastifyInstance) {
+  const log = app.log.child({ component: 'ws:browser' })
+
   // Wire log interceptor → session broadcaster
   setLogBroadcaster((entry) => {
     sessionManager.broadcastControlLog(entry.stream, entry.data, entry.ts)
@@ -29,6 +31,7 @@ export const registerWebSocket = fp(async function wsPlugin(app: FastifyInstance
   app.get('/ws', { websocket: true }, (socket, _req) => {
     const connectionId = randomUUID()
     sessionManager.add(connectionId, socket)
+    log.debug({ connectionId }, 'Browser WebSocket connection opened')
 
     // Require auth within 10 seconds of connecting
     const authTimer = setTimeout(() => {
@@ -59,7 +62,10 @@ export const registerWebSocket = fp(async function wsPlugin(app: FastifyInstance
 
       // Auth message is always allowed
       if (msg.type === 'auth') {
-        void handleAuth(connectionId, socket, msg.token).then(() => clearTimeout(authTimer))
+        void handleAuth(connectionId, socket, msg.token).then(() => {
+          clearTimeout(authTimer)
+          log.debug({ connectionId }, 'Browser WebSocket authenticated')
+        })
         return
       }
 
@@ -125,6 +131,7 @@ export const registerWebSocket = fp(async function wsPlugin(app: FastifyInstance
 
     socket.on('close', () => {
       clearTimeout(authTimer)
+      log.debug({ connectionId }, 'Browser WebSocket disconnected')
       sessionManager.remove(connectionId)
     })
   })

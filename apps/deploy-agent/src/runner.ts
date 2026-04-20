@@ -1,7 +1,9 @@
 import { spawn } from 'node:child_process'
 import type { AgentCommand, AgentResult } from '@ninja/types'
-import { log } from './logger.js'
+import { log as rootLog } from './logger.js'
 import { send, setCurrentJobId } from './connection.js'
+
+const log = rootLog.child({ component: 'runner' })
 
 let activeAbortController: AbortController | null = null
 let activeJobId: string | null = null
@@ -139,25 +141,30 @@ async function executeDeploy(cmd: Extract<AgentCommand, { type: 'deploy' }>): Pr
 
   try {
     // git fetch + reset
+    log.info('Running git fetch + reset', { jobId, commitSha })
     const fetchCode = await runCommand(`git fetch origin && git reset --hard ${commitSha}`, workingDir, jobId, signal)
-    if (fetchCode !== 0) { finish(signal.aborted ? 130 : fetchCode); return }
+    if (fetchCode !== 0) { log.warn('Deploy step failed', { jobId, step: 'git-fetch', exitCode: fetchCode }); finish(signal.aborted ? 130 : fetchCode); return }
 
     // pre-deploy
     if (preDeployCommand !== undefined && preDeployCommand !== '') {
+      log.info('Running pre-deploy command', { jobId })
       const preCode = await runCommand(preDeployCommand, workingDir, jobId, signal)
-      if (preCode !== 0) { finish(signal.aborted ? 130 : preCode); return }
+      if (preCode !== 0) { log.warn('Deploy step failed', { jobId, step: 'pre-deploy', exitCode: preCode }); finish(signal.aborted ? 130 : preCode); return }
     }
 
     // restart
+    log.info('Running restart command', { jobId })
     const restartCode = await runCommand(restartCommand, workingDir, jobId, signal)
-    if (restartCode !== 0) { finish(signal.aborted ? 130 : restartCode); return }
+    if (restartCode !== 0) { log.warn('Deploy step failed', { jobId, step: 'restart', exitCode: restartCode }); finish(signal.aborted ? 130 : restartCode); return }
 
     // post-deploy
     if (postDeployCommand !== undefined && postDeployCommand !== '') {
+      log.info('Running post-deploy command', { jobId })
       const postCode = await runCommand(postDeployCommand, workingDir, jobId, signal)
-      if (postCode !== 0) { finish(signal.aborted ? 130 : postCode); return }
+      if (postCode !== 0) { log.warn('Deploy step failed', { jobId, step: 'post-deploy', exitCode: postCode }); finish(signal.aborted ? 130 : postCode); return }
     }
 
+    log.info('Deploy completed successfully', { jobId })
     finish(0)
   } catch (err) {
     log.error('Unexpected deploy error', { jobId, error: String(err) })
