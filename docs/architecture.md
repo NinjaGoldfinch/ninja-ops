@@ -8,6 +8,10 @@ graph TB
     ForgeCLI["forge-cli (planned)\nCLI · manual deploys & node mgmt"]
     LogService["log-service (planned)\nVector → Loki"]
 
+    Nginx["nginx-01 · port 80\nreverse proxy"]
+
+    Dashboard["dashboard-01\nReact SPA · serve · port 8080"]
+
     subgraph CP["control-plane · Fastify 5 · Node.js 22 · port 3000"]
         Routes["Routes (thin)"]
         Services["Services (logic)"]
@@ -22,7 +26,9 @@ graph TB
         Workers --> Services
     end
 
-    Browser -- "REST /api/* + WebSocket /ws" --> CP
+    Browser -- "HTTP port 80" --> Nginx
+    Nginx -- "/api/* + /ws*" --> CP
+    Nginx -- "everything else" --> Dashboard
     ForgeCLI -- "REST" --> CP
     LogService -. "planned" .-> CP
 
@@ -37,7 +43,9 @@ graph TB
     end
 ```
 
-**dashboard** — React 19 SPA served by Vite on port 5173. In development, Vite proxies `/api/*` and `/ws` to the control plane at `localhost:3000` so there are no CORS concerns locally. In production, serve the built `dist/` behind the same origin as the API (or configure `CORS_ORIGIN`).
+**nginx** — Reverse proxy at `10.0.0.22:80`. Routes `/api/*` and `/ws*` to the control plane; everything else to the dashboard. Browsers only ever talk to nginx — same-origin eliminates CORS. Deploy agents connect directly to the control plane (internal/trusted traffic).
+
+**dashboard** — React 19 SPA served by `serve` on port 8080. Built with `VITE_API_URL=` (empty) so all fetch and WebSocket paths are relative — nginx routes them correctly. In development, Vite proxies `/api/*` and `/ws` to `localhost:3000` automatically.
 
 **forge-cli** (planned) — CLI for manual deploys and node management, talks to the control-plane REST API.
 

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
+import { safeShellCommand, absolutePathSchema } from '@ninja/types'
 import { deployService } from '../../services/deploy.js'
 import { auditService } from '../../services/audit.js'
 import { AppError } from '../../errors.js'
@@ -10,10 +11,10 @@ const CreateTargetSchema = z.object({
   branch: z.string().min(1),
   nodeId: z.string().uuid(),
   vmid: z.number().int().positive(),
-  workingDir: z.string().min(1),
-  restartCommand: z.string().min(1),
-  preDeployCommand: z.string().optional(),
-  postDeployCommand: z.string().optional(),
+  workingDir: absolutePathSchema,
+  restartCommand: safeShellCommand,
+  preDeployCommand: safeShellCommand.optional(),
+  postDeployCommand: safeShellCommand.optional(),
   timeoutSeconds: z.number().int().positive().optional(),
 })
 

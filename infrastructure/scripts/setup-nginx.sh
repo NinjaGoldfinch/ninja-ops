@@ -1,16 +1,12 @@
 #!/bin/bash
-# setup-dashboard.sh — Provision the ninja-ops dashboard in an LXC container
+# setup-nginx.sh — Provision an nginx reverse proxy in an LXC container
 # Self-contained: can be curl-piped or run from the scripts/ directory.
 #
-# The dashboard is built on the control plane container (which already has
-# pnpm and the repo), then the dist/ folder is transferred here and served
-# by `serve`. No build tooling needed in this container — just Node.js.
+# Nginx proxies /api/* and /ws* to the control plane, and everything else
+# to the dashboard. Browsers connect to nginx only — same-origin, no CORS.
 #
 # Usage:
-#   bash setup-dashboard.sh [--yes] [--force] [--help]
-#   VITE_API_URL=http://10.0.0.20:3000 bash setup-dashboard.sh --yes
-#
-# Run setup-control-plane.sh first.
+#   bash setup-nginx.sh [--yes] [--force] [--help]
 
 set -euo pipefail
 
@@ -152,13 +148,12 @@ fi
 # ── Help ─────────────────────────────────────────────────────────────────────
 show_help() {
   cat <<'EOF'
-Usage: setup-dashboard.sh [OPTIONS]
+Usage: setup-nginx.sh [OPTIONS]
 
-Provision the ninja-ops dashboard in an LXC container on Proxmox VE.
+Provision an nginx reverse proxy in an LXC container on Proxmox VE.
 
-The dashboard is built on the control plane container (CT_CP_ID), then
-dist/ is transferred to this container and served by `serve` on port 8080.
-Run setup-control-plane.sh before this script.
+Nginx routes /api/* and /ws* to the control plane and everything else to
+the dashboard. Browsers connect to nginx only (same-origin — no CORS needed).
 
 Options:
   --yes, -y    Skip confirmation prompt
@@ -166,28 +161,23 @@ Options:
   --help, -h   Show this help message
 
 Environment variables (all optional):
-  CT_ID              Dashboard container ID (default: 203)
-  CT_HOSTNAME        Hostname (default: dashboard-01)
-  CT_STORAGE         Storage pool (default: local-lvm)
-  CT_DISK            Disk size in GB (default: 4)
-  CT_MEMORY          Memory in MB (default: 512)
-  CT_SWAP            Swap in MB (default: 256)
-  CT_CORES           CPU cores (default: 1)
-  CT_TEMPLATE_STORAGE  Template storage (default: local)
-  CT_TEMPLATE_DISTRO   Distro pattern (default: debian-13-standard)
-  NET_BRIDGE         Network bridge (default: vmbr0)
-  NET_IP             IP with CIDR (default: 10.0.0.21/24)
-  NET_GW             Gateway (default: 10.0.0.1)
-  NET_DNS            DNS server (default: 1.1.1.1)
-  CT_CP_ID           Control plane container to build on (default: 202)
-  CP_INSTALL_DIR     Repo path on the control plane CT (default: /opt/ninja-ops)
-  CP_SERVICE_USER    Service user on the control plane CT (default: ninja)
-  VITE_API_URL       Control plane URL baked into the bundle (default: http://10.0.0.20:3000)
-  DASH_DIR           Directory to serve from in this container (default: /opt/dashboard)
-  SERVE_PORT         Port serve listens on (default: 8080)
-  SERVICE_USER       System user in this container (default: ninja)
-  NODE_VERSION       Node.js version (default: 22)
-  TZ                 Timezone (default: Pacific/Auckland)
+  NGINX_CT_ID          Container ID (default: 104)
+  NGINX_HOSTNAME       Hostname (default: nginx-01)
+  NGINX_STORAGE        Storage pool (default: local-lvm)
+  NGINX_DISK           Disk size in GB (default: 2)
+  NGINX_MEMORY         Memory in MB (default: 256)
+  NGINX_SWAP           Swap in MB (default: 128)
+  NGINX_CORES          CPU cores (default: 1)
+  NGINX_NET_IP         IP with CIDR (default: 10.0.0.22/24)
+  NGINX_NET_GW         Gateway (default: 10.0.0.1)
+  NGINX_NET_DNS        DNS server (default: 1.1.1.1)
+  NGINX_NET_BRIDGE     Network bridge (default: vmbr0)
+  NGINX_DOMAIN         nginx server_name (default: _)
+  CP_IP                Control-plane IP (default: 10.0.0.20)
+  CP_PORT              Control-plane port (default: 3000)
+  DASH_IP              Dashboard IP (default: 10.0.0.21)
+  DASH_PORT            Dashboard port (default: 8080)
+  TZ                   Timezone (default: Pacific/Auckland)
 EOF
 }
 
@@ -202,37 +192,28 @@ for _arg in "$@"; do
 done
 
 # ── Defaults ─────────────────────────────────────────────────────────────────
-CT_ID="${DASH_CT_ID:-103}"
-CT_HOSTNAME="${DASH_HOSTNAME:-dashboard-01}"
-CT_STORAGE="${DASH_STORAGE:-local-lvm}"
-CT_DISK="${DASH_DISK:-4}"
-CT_MEMORY="${DASH_MEMORY:-512}"
-CT_SWAP="${DASH_SWAP:-256}"
-CT_CORES="${DASH_CORES:-1}"
+CT_ID="${NGINX_CT_ID:-104}"
+CT_HOSTNAME="${NGINX_HOSTNAME:-nginx-01}"
+CT_STORAGE="${NGINX_STORAGE:-local-lvm}"
+CT_DISK="${NGINX_DISK:-2}"
+CT_MEMORY="${NGINX_MEMORY:-256}"
+CT_SWAP="${NGINX_SWAP:-128}"
+CT_CORES="${NGINX_CORES:-1}"
 CT_TEMPLATE_STORAGE="${CT_TEMPLATE_STORAGE:-local}"
-CT_TEMPLATE_DISTRO="${DASH_TEMPLATE:-debian-13-standard}"
-NET_BRIDGE="${DASH_NET_BRIDGE:-vmbr0}"
-NET_IP="${DASH_NET_IP:-10.0.0.21/24}"
-NET_GW="${DASH_NET_GW:-10.0.0.1}"
-NET_DNS="${DASH_NET_DNS:-1.1.1.1}"
-CT_CP_ID="${CP_CT_ID:-${CT_CP_ID:-102}}"
-CP_INSTALL_DIR="${CP_INSTALL_DIR:-/opt/ninja-ops}"
-CP_SERVICE_USER="${CP_SERVICE_USER:-ninja}"
-VITE_API_URL="${DASH_VITE_API_URL:-${VITE_API_URL:-}}"
-DASH_DIR="${DASH_DIR:-/opt/dashboard}"
-SERVE_PORT="${DASH_SERVE_PORT:-${SERVE_PORT:-8080}}"
-SERVICE_USER="${SERVICE_USER:-ninja}"
-NODE_VERSION="${NODE_VERSION:-22}"
-TZ="${DASH_TZ:-${TZ:-Pacific/Auckland}}"
+CT_TEMPLATE_DISTRO="${NGINX_TEMPLATE:-debian-13-standard}"
+NET_BRIDGE="${NGINX_NET_BRIDGE:-vmbr0}"
+NET_IP="${NGINX_NET_IP:-10.0.0.22/24}"
+NET_GW="${NGINX_NET_GW:-10.0.0.1}"
+NET_DNS="${NGINX_NET_DNS:-1.1.1.1}"
+NGINX_DOMAIN="${NGINX_DOMAIN:-_}"
+CP_IP="${CP_IP:-10.0.0.20}"
+CP_PORT="${CP_PORT:-3000}"
+DASH_IP="${DASH_IP:-10.0.0.21}"
+DASH_PORT="${DASH_PORT:-8080}"
+TZ="${NGINX_TZ:-${TZ:-Pacific/Auckland}}"
 
 # ── Preflight ────────────────────────────────────────────────────────────────
 check_proxmox_host
-
-pct status "$CT_CP_ID" 2>/dev/null | grep -q running || \
-  die "Control plane CT $CT_CP_ID is not running — run setup-control-plane.sh first"
-
-exec_ct "$CT_CP_ID" "test -d ${CP_INSTALL_DIR}/apps/dashboard" || \
-  die "Dashboard source not found in CT $CT_CP_ID at ${CP_INSTALL_DIR}/apps/dashboard"
 
 if [ "${OPT_FORCE:-0}" -eq 1 ] && pct status "$CT_ID" >/dev/null 2>&1; then
   log_warn "Destroying existing CT $CT_ID (--force)"
@@ -241,30 +222,16 @@ if [ "${OPT_FORCE:-0}" -eq 1 ] && pct status "$CT_ID" >/dev/null 2>&1; then
 fi
 
 # ── Confirm ──────────────────────────────────────────────────────────────────
-confirm_settings "Dashboard LXC — CT $CT_ID" \
+confirm_settings "Nginx LXC — CT $CT_ID" \
   "CT_ID=$CT_ID" \
   "CT_HOSTNAME=$CT_HOSTNAME" \
   "CT_STORAGE=$CT_STORAGE (${CT_DISK}GB)" \
   "CT_MEMORY=${CT_MEMORY}MB / ${CT_SWAP}MB swap / ${CT_CORES} core" \
   "NET_IP=$NET_IP (gw $NET_GW)" \
-  "CT_CP_ID=$CT_CP_ID (build source)" \
-  "VITE_API_URL=$VITE_API_URL" \
-  "SERVE_PORT=$SERVE_PORT" \
+  "NGINX_DOMAIN=$NGINX_DOMAIN" \
+  "CP_IP=$CP_IP:$CP_PORT" \
+  "DASH_IP=$DASH_IP:$DASH_PORT" \
   "TZ=$TZ"
-
-# ── Build dashboard on control plane container ────────────────────────────────
-log_info "Building dashboard on CT $CT_CP_ID (VITE_API_URL=$VITE_API_URL)..."
-exec_ct "$CT_CP_ID" "cd ${CP_INSTALL_DIR} && \
-  sudo -u ${CP_SERVICE_USER} pnpm --filter @ninja/types build && \
-  VITE_API_URL='${VITE_API_URL}' sudo -u ${CP_SERVICE_USER} pnpm --filter @ninja/dashboard build"
-log_ok "Dashboard built on CT $CT_CP_ID"
-
-# ── Transfer dist/ to this container ─────────────────────────────────────────
-log_info "Transferring dist/ from CT $CT_CP_ID to CT $CT_ID..."
-exec_ct "$CT_CP_ID" "tar -czf /tmp/ninja-dashboard.tar.gz -C ${CP_INSTALL_DIR}/apps/dashboard dist"
-pct pull "$CT_CP_ID" /tmp/ninja-dashboard.tar.gz /tmp/ninja-dashboard.tar.gz
-exec_ct "$CT_CP_ID" "rm -f /tmp/ninja-dashboard.tar.gz"
-log_ok "dist/ pulled from CT $CT_CP_ID"
 
 # ── Find and download template ───────────────────────────────────────────────
 prepare_template "$CT_TEMPLATE_DISTRO" "$CT_TEMPLATE_STORAGE"
@@ -283,88 +250,151 @@ log_info "Configuring locale and timezone..."
 configure_locale_timezone "$CT_ID" "$TZ"
 log_ok "Locale and timezone configured"
 
-# ── Node.js ──────────────────────────────────────────────────────────────────
-log_info "Installing Node.js ${NODE_VERSION}..."
-exec_ct "$CT_ID" "curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - && \
-  apt-get install -y -qq nodejs"
-log_ok "Node.js installed"
+# ── Nginx ─────────────────────────────────────────────────────────────────────
+log_info "Installing nginx..."
+exec_ct "$CT_ID" "LANG=en_US.UTF-8 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nginx"
+log_ok "nginx installed"
 
-# ── serve ─────────────────────────────────────────────────────────────────────
-log_info "Installing serve..."
-exec_ct "$CT_ID" "npm install -g serve"
-log_ok "serve installed"
+# ── Write nginx config ────────────────────────────────────────────────────────
+log_info "Writing nginx config..."
+exec_ct "$CT_ID" "cat > /etc/nginx/sites-available/ninja-ops.conf <<'NGINXEOF'
+upstream control-plane {
+    server ${CP_IP}:${CP_PORT};
+}
 
-# ── Service user ─────────────────────────────────────────────────────────────
-log_info "Creating service user: $SERVICE_USER..."
-exec_ct "$CT_ID" "id -u ${SERVICE_USER} >/dev/null 2>&1 || useradd -m -r -s /bin/bash ${SERVICE_USER}"
-log_ok "Service user ready"
+upstream dashboard {
+    server ${DASH_IP}:${DASH_PORT};
+}
 
-# ── Deploy dist/ ──────────────────────────────────────────────────────────────
-log_info "Deploying dist/ to CT $CT_ID..."
-pct push "$CT_ID" /tmp/ninja-dashboard.tar.gz /tmp/ninja-dashboard.tar.gz
-rm -f /tmp/ninja-dashboard.tar.gz
-exec_ct "$CT_ID" "mkdir -p ${DASH_DIR} && \
-  tar -xzf /tmp/ninja-dashboard.tar.gz -C ${DASH_DIR} && \
-  chown -R ${SERVICE_USER}:${SERVICE_USER} ${DASH_DIR} && \
-  rm /tmp/ninja-dashboard.tar.gz"
-log_ok "dist/ deployed to ${DASH_DIR}/dist"
+server {
+    listen 80;
+    server_name ${NGINX_DOMAIN};
 
-# ── Install systemd service ─────────────────────────────────────────────────
-log_info "Installing systemd service..."
-exec_ct "$CT_ID" "cat > /etc/systemd/system/ninja-dashboard.service <<'UNITEOF'
-[Unit]
-Description=ninja-ops Dashboard
-After=network-online.target
-Wants=network-online.target
+    # Security headers
+    add_header X-Frame-Options DENY always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
 
-[Service]
-Type=simple
-User=${SERVICE_USER}
-WorkingDirectory=${DASH_DIR}
-ExecStart=/bin/serve dist --single -l ${SERVE_PORT}
-Restart=always
-RestartSec=5
-NoNewPrivileges=true
-PrivateTmp=true
+    # --- API routes (REST) ---
+    location /api/ {
+        proxy_pass http://control-plane;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 120s;
+        proxy_send_timeout 120s;
+    }
 
-[Install]
-WantedBy=multi-user.target
-UNITEOF"
+    # --- Health check passthrough ---
+    location = /healthz {
+        proxy_pass http://control-plane;
+        proxy_set_header Host \$host;
+    }
 
-exec_ct "$CT_ID" "systemctl daemon-reload && systemctl enable --now ninja-dashboard"
-log_ok "Service installed and started"
+    # --- WebSocket: browser ---
+    location = /ws {
+        proxy_pass http://control-plane;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \"upgrade\";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+    }
 
-# ── Verify ───────────────────────────────────────────────────────────────────
+    # --- WebSocket: deploy agent ---
+    location = /ws/agent {
+        proxy_pass http://control-plane;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \"upgrade\";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+    }
+
+    # --- WebSocket: log agent ---
+    location = /ws/log-agent {
+        proxy_pass http://control-plane;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \"upgrade\";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+    }
+
+    # --- Dashboard (everything else) ---
+    location / {
+        proxy_pass http://dashboard;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+NGINXEOF"
+log_ok "nginx config written"
+
+# ── Enable site ───────────────────────────────────────────────────────────────
+log_info "Enabling site..."
+exec_ct "$CT_ID" "ln -sf /etc/nginx/sites-available/ninja-ops.conf /etc/nginx/sites-enabled/ninja-ops.conf && \
+  rm -f /etc/nginx/sites-enabled/default"
+log_ok "Site enabled"
+
+# ── Validate config ───────────────────────────────────────────────────────────
+log_info "Validating nginx config..."
+exec_ct "$CT_ID" "nginx -t"
+log_ok "nginx config valid"
+
+# ── Start nginx ───────────────────────────────────────────────────────────────
+log_info "Enabling and starting nginx..."
+exec_ct "$CT_ID" "systemctl enable --now nginx"
+log_ok "nginx enabled and started"
+
+# ── Health check ──────────────────────────────────────────────────────────────
 NET_IP_BARE=$(strip_cidr "$NET_IP")
 
-log_info "Verifying dashboard..."
-_dash_ok=0
+log_info "Waiting for nginx to be ready..."
+_nginx_ok=0
 for _i in $(seq 1 15); do
-  if exec_ct "$CT_ID" "curl -sf http://localhost:${SERVE_PORT}" >/dev/null 2>&1; then
-    _dash_ok=1
+  if exec_ct "$CT_ID" "curl -sf http://localhost/healthz" >/dev/null 2>&1; then
+    _nginx_ok=1
     break
   fi
   sleep 2
 done
 
-if [ "$_dash_ok" -eq 1 ]; then
-  log_ok "Dashboard is responding"
+if [ "$_nginx_ok" -eq 1 ]; then
+  log_ok "nginx health check passed"
 else
-  log_warn "Dashboard did not respond after 30s — check: pct exec $CT_ID -- journalctl -u ninja-dashboard -n 50"
+  log_warn "Health check did not pass after 30s — nginx may be up but control plane unreachable"
+  log_warn "Check: pct exec $CT_ID -- journalctl -u nginx -n 50"
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 printf '\n'
 print_box_top
-print_box_title "Dashboard Ready"
+print_box_title "Nginx Reverse Proxy Ready"
 print_box_mid
 print_box_blank
 print_box_kv "Container" "CT $CT_ID ($CT_HOSTNAME)"
-print_box_kv "Dashboard URL" "http://${NET_IP_BARE}:${SERVE_PORT}"
-print_box_kv "API URL (baked in)" "$VITE_API_URL"
+print_box_kv "Proxy URL" "http://${NET_IP_BARE}"
+print_box_kv "Control plane" "${CP_IP}:${CP_PORT}"
+print_box_kv "Dashboard" "${DASH_IP}:${DASH_PORT}"
 print_box_blank
 print_box_bot
 printf '\n'
 
-log_ok "Done. Dashboard is available at http://${NET_IP_BARE}:${SERVE_PORT}"
-log_info "To redeploy after a code change, rerun this script — the control plane will not restart."
+log_ok "Done. All traffic enters at http://${NET_IP_BARE} — no direct browser access to control plane or dashboard needed."
+log_info "To reload config after changes: pct exec $CT_ID -- nginx -t && pct exec $CT_ID -- systemctl reload nginx"

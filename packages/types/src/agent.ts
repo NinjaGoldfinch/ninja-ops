@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { absolutePathSchema, commitShaSchema, safeShellCommand } from './deploy.js'
 
 // ── Agent identity ────────────────────────────────────────────────────────
 
@@ -55,12 +56,12 @@ export const AgentCommandSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('deploy'),
     jobId: z.string().uuid(),
-    workingDir: z.string(),
-    preDeployCommand: z.string().optional(),
-    restartCommand: z.string(),
-    postDeployCommand: z.string().optional(),
+    workingDir: absolutePathSchema,
+    preDeployCommand: safeShellCommand.optional(),
+    restartCommand: safeShellCommand,
+    postDeployCommand: safeShellCommand.optional(),
     timeoutSeconds: z.number().int().positive(),
-    commitSha: z.string().length(40),
+    commitSha: commitShaSchema,
   }),
   z.object({
     type: z.literal('cancel'),

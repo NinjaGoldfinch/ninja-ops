@@ -1,6 +1,6 @@
 # ninja-ops LXC Deployment
 
-Provisions four Debian 12 LXC containers on a Proxmox VE host using `pct create` / `pct exec`. No Ansible, no external orchestration. The dashboard is built on the control plane container and transferred over — CT dashboard needs only Node.js to run `serve`.
+Provisions five Debian 13 LXC containers on a Proxmox VE host using `pct create` / `pct exec`. No Ansible, no external orchestration. The dashboard is built on the control plane container and transferred over — CT dashboard needs only Node.js to run `serve`. An nginx reverse proxy provides a single entry point for browsers.
 
 ## Prerequisites
 
@@ -17,6 +17,7 @@ Provisions four Debian 12 LXC containers on a Proxmox VE host using `pct create`
 | redis-01 | 10.0.0.11 | Redis |
 | control-plane-01 | 10.0.0.20 | Fastify API (port 3000) |
 | dashboard-01 | 10.0.0.21 | React + serve (port 8080) |
+| nginx-01 | 10.0.0.22 | Nginx reverse proxy (port 80) |
 
 All IPs, ports, and hostnames are configurable via environment variables.
 
@@ -30,7 +31,8 @@ These are the default values used when no overrides are set. All can be changed 
 | redis-01 | 4 GB | 512 MB | 256 MB | 1 |
 | control-plane-01 | 8 GB | 2048 MB | 512 MB | 2 |
 | dashboard-01 | 4 GB | 512 MB | 256 MB | 1 |
-| **Total** | **24 GB** | **4 GB** | **1.5 GB** | **6** |
+| nginx-01 | 2 GB | 256 MB | 128 MB | 1 |
+| **Total** | **26 GB** | **4.25 GB** | **1.625 GB** | **7** |
 
 ---
 
@@ -80,6 +82,13 @@ bash setup-control-plane.sh
 ```bash
 curl -sSL "${RAW}/infrastructure/scripts/setup-dashboard.sh" -o setup-dashboard.sh
 bash setup-dashboard.sh
+```
+
+### 6. Nginx
+
+```bash
+curl -sSL "${RAW}/infrastructure/scripts/setup-nginx.sh" -o setup-nginx.sh
+bash setup-nginx.sh
 ```
 
 ---
@@ -182,10 +191,31 @@ All scripts accept `--yes` (skip prompt), `--force` (destroy and recreate), and 
 | `NET_IP` | `10.0.0.21/24` | Container IP/CIDR |
 | `CT_CP_ID` | `102` | Control plane CT to build on |
 | `CP_INSTALL_DIR` | `/opt/ninja-ops` | Repo path on the control plane CT |
-| `VITE_API_URL` | `http://10.0.0.20:3000` | Control plane URL baked into the bundle |
+| `VITE_API_URL` | *(empty — behind nginx)* | Control plane URL baked into the bundle |
 | `DASH_DIR` | `/opt/dashboard` | Directory to serve from |
 | `SERVE_PORT` | `8080` | Port `serve` listens on |
 | `NODE_VERSION` | `22` | Node.js version |
+| `TZ` | `Pacific/Auckland` | Timezone |
+
+### setup-nginx.sh
+
+| Variable | Default | Description |
+|---|---|---|
+| `NGINX_CT_ID` | `104` | Container ID |
+| `NGINX_HOSTNAME` | `nginx-01` | Container hostname |
+| `NGINX_STORAGE` | `local-lvm` | Storage pool |
+| `NGINX_DISK` | `2` | Disk size (GB) |
+| `NGINX_MEMORY` | `256` | Memory (MB) |
+| `NGINX_SWAP` | `128` | Swap (MB) |
+| `NGINX_CORES` | `1` | CPU cores |
+| `NGINX_NET_IP` | `10.0.0.22/24` | Container IP/CIDR |
+| `NGINX_NET_GW` | `10.0.0.1` | Gateway |
+| `NGINX_NET_DNS` | `1.1.1.1` | DNS server |
+| `NGINX_DOMAIN` | `_` | nginx `server_name` (use real domain for TLS later) |
+| `CP_IP` | `10.0.0.20` | Control-plane IP |
+| `CP_PORT` | `3000` | Control-plane port |
+| `DASH_IP` | `10.0.0.21` | Dashboard IP |
+| `DASH_PORT` | `8080` | Dashboard port |
 | `TZ` | `Pacific/Auckland` | Timezone |
 
 ---
@@ -214,13 +244,13 @@ pct exec 102 -- bash -c "
 Build on CT 102, transfer to CT 103 — the control plane never restarts.
 
 ```bash
-# Build on the control plane
+# Build on the control plane (VITE_API_URL empty = same-origin via nginx)
 pct exec 102 -- bash -c "
   cd /opt/ninja-ops && \
   sudo -u ninja git pull && \
   sudo -u ninja pnpm install --frozen-lockfile && \
   sudo -u ninja pnpm --filter @ninja/types build && \
-  VITE_API_URL=http://10.0.0.20:3000 sudo -u ninja pnpm --filter @ninja/dashboard build && \
+  VITE_API_URL= sudo -u ninja pnpm --filter @ninja/dashboard build && \
   tar -czf /tmp/ninja-dashboard.tar.gz -C /opt/ninja-ops/apps/dashboard dist
 "
 
@@ -237,6 +267,14 @@ pct exec 103 -- bash -c "
 "
 ```
 
+### Nginx
+
+After editing `/etc/nginx/sites-available/ninja-ops.conf` on CT 104:
+
+```bash
+pct exec 104 -- nginx -t && pct exec 104 -- systemctl reload nginx
+```
+
 ---
 
 ## Troubleshooting
@@ -247,6 +285,8 @@ pct exec 102 -- journalctl -u ninja-control-plane -f
 pct exec 103 -- journalctl -u ninja-dashboard -f
 pct exec 100 -- journalctl -u postgresql -f
 pct exec 101 -- journalctl -u redis-server -f
+pct exec 104 -- journalctl -u nginx -f
+pct exec 104 -- tail -f /var/log/nginx/error.log
 
 # Open a shell
 pct exec 102 -- bash
@@ -262,6 +302,7 @@ pct exec 102 -- redis-cli -h 10.0.0.11 ping
 # Health checks from host
 curl http://10.0.0.20:3000/healthz
 curl -I http://10.0.0.21:8080
+curl http://10.0.0.22/healthz
 ```
 
 ---
@@ -273,3 +314,4 @@ curl -I http://10.0.0.21:8080
 - Redis binds to `0.0.0.0` — protected by LXC network isolation; set `REDIS_PASSWORD` for defence-in-depth
 - PostgreSQL uses `scram-sha-256` and only accepts connections from `PG_ALLOWED_NETWORK`
 - The `ninja` service user has no sudo privileges at runtime (`NoNewPrivileges=true` in systemd units)
+- End users connect to nginx only (10.0.0.22:80). The control-plane and dashboard are not directly exposed to browsers.

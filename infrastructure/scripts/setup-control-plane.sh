@@ -249,7 +249,7 @@ AGENT_SECRET="${AGENT_SECRET:-$(gen_secret 64)}"
 GITHUB_WEBHOOK_SECRET="${GITHUB_WEBHOOK_SECRET:-$(gen_secret 32)}"
 ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-$(gen_secret 12)}"
-CORS_ORIGIN="${CORS_ORIGIN:-http://10.0.0.21}"
+CORS_ORIGIN="${CORS_ORIGIN:-}"
 
 # ── Preflight ────────────────────────────────────────────────────────────────
 check_proxmox_host

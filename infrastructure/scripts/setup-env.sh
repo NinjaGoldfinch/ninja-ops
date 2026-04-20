@@ -305,10 +305,55 @@ DASH_CORES="$REPLY"
 prompt_default "Serve port" "8080" "8080, 3001"
 DASH_SERVE_PORT="$REPLY"
 
-_cp_ip_bare="${CP_NET_IP%%/*}"
-_vite_default="http://${_cp_ip_bare}:${CP_PORT}"
-prompt_default "Control plane API URL" "$_vite_default" "http://10.0.0.20:3000"
+prompt_default "VITE_API_URL (empty = behind nginx)" "" "leave empty when using nginx"
 DASH_VITE_API_URL="$REPLY"
+
+# ── Nginx Container ───────────────────────────────────────────────────────────
+printf '\n' >/dev/tty
+log_info "━━━ Nginx Container ..."
+
+prompt_default "VMID" "104"
+NGINX_CT_ID="$REPLY"
+
+prompt_default "Hostname" "nginx-01"
+NGINX_HOSTNAME="$REPLY"
+
+prompt_default "Storage pool" "local-lvm"
+NGINX_STORAGE="$REPLY"
+
+prompt_default "Timezone" "$PG_TZ"
+NGINX_TZ="$REPLY"
+
+prompt_default "IP/CIDR" "10.0.0.22/24"
+NGINX_NET_IP="$REPLY"
+
+if [ "$NGINX_NET_IP" != "dhcp" ]; then
+  prompt_default "Gateway" "10.0.0.1"
+  NGINX_NET_GW="$REPLY"
+else
+  NGINX_NET_GW=""
+fi
+
+prompt_default "DNS" "1.1.1.1"
+NGINX_NET_DNS="$REPLY"
+
+prompt_default "Bridge" "vmbr0"
+NGINX_NET_BRIDGE="$REPLY"
+
+prompt_default "Disk (GB)" "2"
+NGINX_DISK="$REPLY"
+
+prompt_default "Memory (MB)" "256"
+NGINX_MEMORY="$REPLY"
+
+prompt_default "Swap (MB)" "128"
+NGINX_SWAP="$REPLY"
+
+prompt_default "Cores" "1"
+NGINX_CORES="$REPLY"
+
+prompt_default "server_name (domain or _ for any)" "_" "ops.example.com"
+NGINX_DOMAIN="$REPLY"
 
 # ── Derive connection URLs ────────────────────────────────────────────────────
 _pg_ip_bare="${PG_NET_IP%%/*}"
@@ -418,6 +463,21 @@ DASH_SWAP=${DASH_SWAP}
 DASH_CORES=${DASH_CORES}
 DASH_SERVE_PORT=${DASH_SERVE_PORT}
 DASH_VITE_API_URL=${DASH_VITE_API_URL}
+
+# ── Nginx (CT ${NGINX_CT_ID})
+NGINX_CT_ID=${NGINX_CT_ID}
+NGINX_HOSTNAME=${NGINX_HOSTNAME}
+NGINX_STORAGE=${NGINX_STORAGE}
+NGINX_TZ=${NGINX_TZ}
+NGINX_NET_IP=${NGINX_NET_IP}
+NGINX_NET_GW=${NGINX_NET_GW}
+NGINX_NET_DNS=${NGINX_NET_DNS}
+NGINX_NET_BRIDGE=${NGINX_NET_BRIDGE}
+NGINX_DISK=${NGINX_DISK}
+NGINX_MEMORY=${NGINX_MEMORY}
+NGINX_SWAP=${NGINX_SWAP}
+NGINX_CORES=${NGINX_CORES}
+NGINX_DOMAIN=${NGINX_DOMAIN}
 EOF
 
 printf '\n'
@@ -434,4 +494,5 @@ printf '  bash setup-postgres.sh\n'
 printf '  bash setup-redis.sh\n'
 printf '  bash setup-control-plane.sh\n'
 printf '  bash setup-dashboard.sh\n'
+printf '  bash setup-nginx.sh\n'
 printf '\n'
