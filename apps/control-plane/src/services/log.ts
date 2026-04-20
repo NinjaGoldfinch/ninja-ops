@@ -128,21 +128,21 @@ export class LogService {
     // Map bucket size to postgres date_trunc field
     const truncField = params.bucket === 'minute' ? 'minute' : params.bucket === 'day' ? 'day' : 'hour'
 
-    // Bucket counts by level
-    interface BucketRow { bucket_ts: string; level: string; cnt: string }
+    // Bucket counts by level — extract epoch ms directly to avoid timezone ambiguity
+    interface BucketRow { bucket_ms: string; level: string; cnt: string }
     const bucketRows = await sql<BucketRow[]>`
       SELECT
-        date_trunc(${truncField}, to_timestamp(ts / 1000.0) AT TIME ZONE 'UTC') AS bucket_ts,
+        (EXTRACT(EPOCH FROM date_trunc(${truncField}, to_timestamp(ts / 1000.0) AT TIME ZONE 'UTC')) * 1000)::bigint::text AS bucket_ms,
         level,
         COUNT(*)::text AS cnt
       FROM log_entries
       ${where}
-      GROUP BY bucket_ts, level
-      ORDER BY bucket_ts ASC
+      GROUP BY bucket_ms, level
+      ORDER BY bucket_ms ASC
     `
 
     const buckets = bucketRows.map((r) => ({
-      ts:    new Date(r.bucket_ts).getTime(),
+      ts:    Number(r.bucket_ms),
       level: r.level as LogEntryRow['level'],
       count: Number(r.cnt),
     }))
