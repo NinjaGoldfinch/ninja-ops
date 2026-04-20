@@ -1,5 +1,9 @@
 import type { WebSocket } from '@fastify/websocket'
-import type { Role, GuestMetrics, NodeMetrics, DeployJob, DeployLogLine, ProvisioningJob, Agent, LogEntryRow } from '@ninja/types'
+import type { Role, GuestMetrics, NodeMetrics, DeployJob, DeployLogLine, ProvisioningJob, Agent, LogEntryRow, LogQueryParams } from '@ninja/types'
+
+// Looser type that accepts both "key absent" and "key present as undefined"
+// (needed because Zod's .partial() produces `T | undefined` for each field)
+type LogFilter = { [K in keyof LogQueryParams]?: LogQueryParams[K] | undefined }
 
 interface WsSession {
   ws: WebSocket
@@ -10,12 +14,31 @@ interface WsSession {
   terminalSessions: Set<string>      // sessionId
   controlLogSubscribed: boolean
   logSubscriptions: Set<number>      // vmid
+  logFilter: LogFilter | null
 }
 
 function send(ws: WebSocket, msg: object): void {
   if (ws.readyState === ws.OPEN) {
     ws.send(JSON.stringify(msg))
   }
+}
+
+export function matchesLogFilter(entry: LogEntryRow, filter: LogFilter): boolean {
+  if (filter.vmid !== undefined && entry.vmid !== filter.vmid) return false
+  if (filter.vmids?.length && !filter.vmids.includes(entry.vmid)) return false
+  if (filter.nodeId !== undefined && entry.nodeId !== filter.nodeId) return false
+  if (filter.source !== undefined && entry.source !== filter.source) return false
+  if (filter.sources?.length && !filter.sources.includes(entry.source)) return false
+  if (filter.level !== undefined && entry.level !== filter.level) return false
+  if (filter.levels?.length && !filter.levels.includes(entry.level)) return false
+  if (filter.unit !== undefined && entry.unit !== filter.unit) return false
+  if (filter.units?.length && entry.unit !== null && !filter.units.includes(entry.unit)) return false
+  if (filter.from !== undefined && entry.ts < filter.from) return false
+  if (filter.to !== undefined && entry.ts > filter.to) return false
+  if (filter.search) {
+    if (!entry.line.toLowerCase().includes(filter.search.toLowerCase())) return false
+  }
+  return true
 }
 
 export class SessionManager {
@@ -31,6 +54,7 @@ export class SessionManager {
       terminalSessions: new Set(),
       controlLogSubscribed: false,
       logSubscriptions: new Set(),
+      logFilter: null,
     })
   }
 
@@ -126,10 +150,26 @@ export class SessionManager {
     this.sessions.get(connectionId)?.logSubscriptions.delete(vmid)
   }
 
+  setLogFilter(connectionId: string, filter: LogFilter): void {
+    const session = this.sessions.get(connectionId)
+    if (session) session.logFilter = filter
+  }
+
   broadcastLogLine(data: LogEntryRow): void {
     for (const session of this.sessions.values()) {
+      if (!session.userId) continue
+
+      // Legacy vmid-based subscriptions
       if (session.logSubscriptions.has(data.vmid)) {
         send(session.ws, { type: 'log_line', data })
+        continue
+      }
+
+      // Filter-based subscriptions
+      if (session.logFilter !== null) {
+        if (matchesLogFilter(data, session.logFilter)) {
+          send(session.ws, { type: 'log_line', data })
+        }
       }
     }
   }

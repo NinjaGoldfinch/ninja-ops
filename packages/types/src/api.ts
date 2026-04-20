@@ -27,6 +27,9 @@ export const API_ERROR_CODES = [
   'INTERNAL_ERROR',
   'RATE_LIMITED',
   'WEBHOOK_INVALID_SIGNATURE',
+  'EXPORT_TOO_LARGE',
+  'FILTER_NOT_FOUND',
+  'REGEX_INVALID',
 ] as const
 export const ApiErrorCodeSchema = z.enum(API_ERROR_CODES)
 export type ApiErrorCode = z.infer<typeof ApiErrorCodeSchema>

@@ -57,8 +57,20 @@ export class AppError extends Error {
 
   static validationError(
     message: string,
-    details: Array<{ path: Array<string | number>; message: string }>,
+    details?: Array<{ path: Array<string | number>; message: string }>,
   ): AppError {
     return new AppError('VALIDATION_ERROR', message, 422, details)
+  }
+
+  static exportTooLarge(message = 'Export exceeds maximum row limit'): AppError {
+    return new AppError('EXPORT_TOO_LARGE', message, 400)
+  }
+
+  static filterNotFound(): AppError {
+    return new AppError('FILTER_NOT_FOUND', 'Saved filter not found', 404)
+  }
+
+  static regexInvalid(message = 'Invalid regular expression'): AppError {
+    return new AppError('REGEX_INVALID', message, 400)
   }
 }

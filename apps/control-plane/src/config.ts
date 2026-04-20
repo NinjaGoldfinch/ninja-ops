@@ -38,6 +38,8 @@ const ConfigSchema = z.object({
   RATE_LIMIT_MAX: z.coerce.number().default(100),
   RATE_LIMIT_WINDOW: z.coerce.number().default(60_000),
 
+  LOG_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(30),
+
   // 1Password service account token — required only when op:// secret references are used
   // for SSH private keys. Get one at: https://developer.1password.com/docs/service-accounts/
   OP_SERVICE_ACCOUNT_TOKEN: z.string().optional(),

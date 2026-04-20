@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { GuestMetricsSchema, NodeMetricsSchema } from './proxmox.js'
 import { DeployJobSchema, DeployLogLineSchema } from './deploy.js'
-import { LogEntryRowSchema } from './logs.js'
+import { LogEntryRowSchema, LogQueryParamsSchema, LogStatsResponseSchema } from './logs.js'
 import { AgentCommandSchema, AgentHeartbeatSchema, AgentResultSchema, AgentSchema } from './agent.js'
 import { ProvisioningJobSchema } from './provisioning.js'
 
@@ -36,6 +36,14 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('unsubscribe_logs'),
     vmid: z.number().int().positive(),
+  }),
+
+  // Subscribe to filtered live log stream
+  z.object({
+    type: z.literal('subscribe_logs_filtered'),
+    payload: z.object({
+      filter: LogQueryParamsSchema.partial(),
+    }),
   }),
 
   // Subscribe to deploy job output
@@ -120,6 +128,12 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('log_line'),
     data: LogEntryRowSchema,
+  }),
+
+  // Log stats push (for histogram updates)
+  z.object({
+    type: z.literal('log_stats_update'),
+    payload: LogStatsResponseSchema,
   }),
 
   // Deploy updates

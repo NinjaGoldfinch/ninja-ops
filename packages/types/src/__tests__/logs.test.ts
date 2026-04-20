@@ -7,6 +7,9 @@ import {
   LokiLabelsSchema,
   LogQuerySchema,
   LogSubscriptionSchema,
+  LogQueryParamsSchema,
+  LogStatsParamsSchema,
+  SavedLogFilterSchema,
 } from '../logs.js'
 
 describe('LOG_LEVELS', () => {
@@ -153,6 +156,108 @@ describe('LogSubscriptionSchema', () => {
       source: { kind: 'control-plane' },
       levels: ['critical'],
     })
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('LogQueryParamsSchema', () => {
+  it('applies defaults for limit and searchMode', () => {
+    const result = LogQueryParamsSchema.safeParse({})
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.limit).toBe(100)
+      expect(result.data.searchMode).toBe('text')
+    }
+  })
+
+  it('parses multi-value filters', () => {
+    const result = LogQueryParamsSchema.safeParse({
+      levels: ['info', 'warn', 'error'],
+      sources: ['app', 'agent'],
+      vmids: ['101', '102'],
+      units: ['nginx', 'api'],
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.levels).toEqual(['info', 'warn', 'error'])
+      expect(result.data.sources).toEqual(['app', 'agent'])
+      expect(result.data.vmids).toEqual([101, 102])
+    }
+  })
+
+  it('rejects invalid enum value in levels array', () => {
+    const result = LogQueryParamsSchema.safeParse({ levels: ['info', 'critical'] })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects invalid enum value in sources array', () => {
+    const result = LogQueryParamsSchema.safeParse({ sources: ['app', 'unknown'] })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects limit above 500', () => {
+    const result = LogQueryParamsSchema.safeParse({ limit: 501 })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects invalid searchMode', () => {
+    const result = LogQueryParamsSchema.safeParse({ searchMode: 'fuzzy' })
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('LogStatsParamsSchema', () => {
+  it('defaults bucket to hour', () => {
+    const result = LogStatsParamsSchema.safeParse({})
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.bucket).toBe('hour')
+    }
+  })
+
+  it('accepts all valid bucket values', () => {
+    for (const bucket of ['minute', 'hour', 'day']) {
+      const result = LogStatsParamsSchema.safeParse({ bucket })
+      expect(result.success).toBe(true)
+    }
+  })
+
+  it('rejects invalid bucket', () => {
+    const result = LogStatsParamsSchema.safeParse({ bucket: 'week' })
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('SavedLogFilterSchema', () => {
+  const validFilter = {
+    id: crypto.randomUUID(),
+    name: 'Errors only',
+    filter: { levels: ['error', 'fatal'], limit: 100 },
+    createdAt: new Date().toISOString(),
+  }
+
+  it('parses a valid saved filter', () => {
+    const result = SavedLogFilterSchema.safeParse(validFilter)
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects name longer than 100 characters', () => {
+    const result = SavedLogFilterSchema.safeParse({ ...validFilter, name: 'x'.repeat(101) })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects empty name', () => {
+    const result = SavedLogFilterSchema.safeParse({ ...validFilter, name: '' })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects invalid id (not a UUID)', () => {
+    const result = SavedLogFilterSchema.safeParse({ ...validFilter, id: 'not-a-uuid' })
+    expect(result.success).toBe(false)
+  })
+
+  it('safeParse returns error for missing required fields', () => {
+    const result = SavedLogFilterSchema.safeParse({ name: 'test' })
     expect(result.success).toBe(false)
   })
 })

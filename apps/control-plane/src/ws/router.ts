@@ -100,6 +100,9 @@ export const registerWebSocket = fp(async function wsPlugin(app: FastifyInstance
         case 'unsubscribe_logs':
           sessionManager.unsubscribeLog(connectionId, msg.vmid)
           break
+        case 'subscribe_logs_filtered':
+          sessionManager.setLogFilter(connectionId, msg.payload.filter)
+          break
         case 'subscribe_control_logs':
           if (session.role === 'admin') {
             sessionManager.subscribeControlLog(connectionId)

@@ -147,15 +147,63 @@ export type LogAgentServerMessage = z.infer<typeof LogAgentServerMessageSchema>
 // ── Log query params (REST) ───────────────────────────────────────────────
 
 export const LogQueryParamsSchema = z.object({
-  vmid:   z.coerce.number().int().positive().optional(),
-  nodeId: z.string().uuid().optional(),
-  source: z.enum(LOG_SOURCES).optional(),
-  level:  LogLevelSchema.optional(),
-  unit:   z.string().optional(),
-  from:   z.coerce.number().int().optional(),   // unix ms
-  to:     z.coerce.number().int().optional(),   // unix ms
-  search: z.string().max(256).optional(),
-  limit:  z.coerce.number().int().min(1).max(1000).default(200),
-  cursor: z.coerce.number().int().optional(),   // last seen id for pagination
+  vmid:    z.coerce.number().int().positive().optional(),
+  nodeId:  z.string().uuid().optional(),
+  source:  z.enum(LOG_SOURCES).optional(),
+  level:   LogLevelSchema.optional(),
+  unit:    z.string().optional(),
+  from:    z.coerce.number().int().optional(),   // unix ms
+  to:      z.coerce.number().int().optional(),   // unix ms
+  search:  z.string().max(256).optional(),
+  cursor:  z.coerce.number().int().optional(),   // last seen id for pagination
+  // multi-value filters
+  levels:  z.array(LogLevelSchema).optional(),
+  sources: z.array(z.enum(LOG_SOURCES)).optional(),
+  vmids:   z.array(z.coerce.number().int().positive()).optional(),
+  units:   z.array(z.string()).optional(),
+  // updated
+  limit:      z.coerce.number().int().min(1).max(500).default(100),
+  searchMode: z.enum(['text', 'regex']).default('text'),
 })
 export type LogQueryParams = z.infer<typeof LogQueryParamsSchema>
+
+// ── Log stats ─────────────────────────────────────────────────────────────
+
+export const LogBucketSchema = z.object({
+  ts:    z.number(),        // unix ms bucket start
+  level: LogLevelSchema,
+  count: z.number().int(),
+})
+export type LogBucket = z.infer<typeof LogBucketSchema>
+
+export const LogStatsResponseSchema = z.object({
+  buckets:    z.array(LogBucketSchema),
+  totalCount: z.number().int(),
+  byLevel:    z.record(z.string(), z.number().int()),
+  bySource:   z.record(z.string(), z.number().int()),
+})
+export type LogStatsResponse = z.infer<typeof LogStatsResponseSchema>
+
+export const LogStatsParamsSchema = z.object({
+  vmid:   z.coerce.number().int().positive().optional(),
+  vmids:  z.array(z.coerce.number().int().positive()).optional(),
+  nodeId: z.string().uuid().optional(),
+  levels: z.array(LogLevelSchema).optional(),
+  from:   z.coerce.number().int().optional(),
+  to:     z.coerce.number().int().optional(),
+  bucket: z.enum(['minute', 'hour', 'day']).default('hour'),
+})
+export type LogStatsParams = z.infer<typeof LogStatsParamsSchema>
+
+// ── Saved log filters ─────────────────────────────────────────────────────
+
+export const SavedLogFilterSchema = z.object({
+  id:        z.string().uuid(),
+  name:      z.string().min(1).max(100),
+  filter:    LogQueryParamsSchema.partial(),
+  createdAt: z.string().datetime(),
+})
+export type SavedLogFilter = z.infer<typeof SavedLogFilterSchema>
+
+export const CreateSavedLogFilterSchema = SavedLogFilterSchema.omit({ id: true, createdAt: true })
+export type CreateSavedLogFilter = z.infer<typeof CreateSavedLogFilterSchema>
