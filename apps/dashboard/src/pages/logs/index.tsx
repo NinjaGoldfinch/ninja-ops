@@ -306,16 +306,19 @@ function StatsBar({ params, onBucketClick }: {
 
 // ── Log row (click to expand) ─────────────────────────────────────────────────
 
-function LogRow({ entry, style }: { entry: LogEntryRow; style: React.CSSProperties }) {
-  const [expanded, setExpanded] = useState(false)
+function LogRow({ entry, isExpanded, onToggle }: {
+  entry: LogEntryRow
+  isExpanded: boolean
+  onToggle: () => void
+}) {
   const borderColor = LEVEL_BORDER[entry.level] ?? 'border-l-zinc-700'
   const badgeVariant = LEVEL_BADGE_VARIANT[entry.level] ?? 'secondary'
 
   return (
-    <div style={style}>
+    <div>
       <div
-        className={`border-l-2 ${borderColor} flex items-start gap-2 font-mono text-xs py-0.5 px-2 hover:bg-zinc-800/40 cursor-pointer`}
-        onClick={() => setExpanded((e) => !e)}
+        className={`border-l-2 ${borderColor} flex items-start gap-2 font-mono text-xs py-0.5 px-2 hover:bg-zinc-800/40 cursor-pointer ${isExpanded ? 'bg-zinc-800/60' : ''}`}
+        onClick={onToggle}
       >
         <span className="text-zinc-600 shrink-0 w-36 select-none whitespace-nowrap">
           {new Date(entry.ts).toLocaleString(undefined, {
@@ -331,7 +334,7 @@ function LogRow({ entry, style }: { entry: LogEntryRow; style: React.CSSProperti
         <Badge variant={badgeVariant} className="shrink-0">{entry.level}</Badge>
         <span className="text-zinc-200 break-all">{entry.line}</span>
       </div>
-      {expanded && (
+      {isExpanded && (
         <div className="bg-zinc-900 border-l-2 border-zinc-700 mx-2 mb-1 p-2 rounded-r text-xs font-mono">
           <pre className="whitespace-pre-wrap text-zinc-300 break-all">
             {JSON.stringify({
@@ -355,6 +358,7 @@ function LogTable({ rows, onLoadMore, hasMore, isLoading }: {
   isLoading: boolean
 }) {
   const parentRef = useRef<HTMLDivElement>(null)
+  const [expandedId, setExpandedId] = useState<number | null>(null)
 
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -395,16 +399,23 @@ function LogTable({ rows, onLoadMore, hasMore, isLoading }: {
           const entry = rows[item.index]
           if (!entry) return null
           return (
-            <LogRow
+            <div
               key={item.key}
-              entry={entry}
+              data-index={item.index}
+              ref={virtualizer.measureElement}
               style={{
                 position: 'absolute',
                 top: item.start,
                 left: 0,
                 right: 0,
               }}
-            />
+            >
+              <LogRow
+                entry={entry}
+                isExpanded={expandedId === entry.id}
+                onToggle={() => setExpandedId((prev) => prev === entry.id ? null : entry.id)}
+              />
+            </div>
           )
         })}
       </div>
