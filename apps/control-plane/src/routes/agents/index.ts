@@ -5,8 +5,10 @@ import { agentService } from '../../services/agent.js'
 import { requireRole } from '../../plugins/rbac.js'
 import { AppError } from '../../errors.js'
 import { config } from '../../config.js'
+import redeployRoutes from './redeploy.js'
 
 export default async function agentRoutes(app: FastifyInstance) {
+  await app.register(redeployRoutes)
   // POST /api/agents/register
   app.post(
     '/register',

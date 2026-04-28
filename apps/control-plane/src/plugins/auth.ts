@@ -7,11 +7,14 @@ import { AppError } from '../errors.js'
 
 const secret = new TextEncoder().encode(config.JWT_SECRET)
 
-export async function signToken(payload: Omit<JwtPayload, 'iat' | 'exp'>): Promise<string> {
+export async function signToken(
+  payload: Omit<JwtPayload, 'iat' | 'exp'>,
+  expiry: string = config.JWT_EXPIRY,
+): Promise<string> {
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime(config.JWT_EXPIRY)
+    .setExpirationTime(expiry)
     .sign(secret)
 }
 

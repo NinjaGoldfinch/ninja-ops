@@ -13,6 +13,7 @@ import { startWorkers, stopWorkers } from './workers/metrics-poller.js'
 import { startDeployWorker, stopDeployWorker } from './workers/deploy-runner.js'
 import { startProvisioningWorker, stopProvisioningWorker } from './workers/provisioning-runner.js'
 import { startLogPurgeWorker, stopLogPurgeWorker } from './workers/log-purge.js'
+import { startAgentRedeployWorker, stopAgentRedeployWorker } from './workers/agent-redeploy-runner.js'
 
 // Warn early if agent bundles are missing — deployments will fail at the download step
 if (!existsSync(config.AGENT_BUNDLE_PATH)) {
@@ -32,6 +33,7 @@ await connectRedis()
 await startWorkers()
 await startDeployWorker()
 await startProvisioningWorker()
+await startAgentRedeployWorker()
 await startLogPurgeWorker()
 
 const app = await buildApp()
@@ -42,6 +44,7 @@ const shutdown = async (signal: string) => {
   await stopWorkers()
   await stopDeployWorker()
   await stopProvisioningWorker()
+  await stopAgentRedeployWorker()
   await stopLogPurgeWorker()
   await closeRedis()
   await closeDb()

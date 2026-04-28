@@ -1,5 +1,5 @@
 import type { WebSocket } from '@fastify/websocket'
-import type { Role, GuestMetrics, NodeMetrics, DeployJob, DeployLogLine, ProvisioningJob, Agent, LogEntryRow, LogQueryParams } from '@ninja/types'
+import type { Role, GuestMetrics, NodeMetrics, DeployJob, DeployLogLine, ProvisioningJob, Agent, LogEntryRow, LogQueryParams, AgentRedeployJob } from '@ninja/types'
 
 // Looser type that accepts both "key absent" and "key present as undefined"
 // (needed because Zod's .partial() produces `T | undefined` for each field)
@@ -186,6 +186,14 @@ export class SessionManager {
     for (const session of this.sessions.values()) {
       if (session.userId) {
         send(session.ws, { type: 'agent_status', data })
+      }
+    }
+  }
+
+  broadcastRedeployUpdate(data: AgentRedeployJob): void {
+    for (const session of this.sessions.values()) {
+      if (session.userId) {
+        send(session.ws, { type: 'redeploy_update', data })
       }
     }
   }

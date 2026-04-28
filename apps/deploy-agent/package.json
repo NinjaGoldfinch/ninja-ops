@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch --env-file=../../env/deploy-agent.env src/index.ts",
     "build": "tsc",
-    "package": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=esm --external:node:* --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\" --outfile=dist-bundle/index.js && node ../../scripts/package-agent.mjs",
+    "package": "node ../../scripts/package-agent.mjs",
     "start": "node --env-file=../../env/deploy-agent.env dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",

@@ -3,6 +3,7 @@ import { bullmqConnection } from '../db/redis.js'
 import { childLogger } from '../lib/logger.js'
 import { config } from '../config.js'
 import { logService } from '../services/log.js'
+import { sql } from '../db/client.js'
 
 const log = childLogger('log-purge')
 
@@ -23,8 +24,12 @@ export async function startLogPurgeWorker(): Promise<void> {
   })
 
   purgeWorker = new Worker(QUEUE_NAME, async () => {
-    const deleted = await logService.purgeOlderThan(config.LOG_RETENTION_DAYS)
-    log.info({ deleted, retentionDays: config.LOG_RETENTION_DAYS }, 'Purged old log entries')
+    const [row] = await sql<[{ value: { retentionDays: number } }?]>`
+      SELECT value FROM settings WHERE key = 'log_retention_days'
+    `
+    const retentionDays = row?.value?.retentionDays ?? config.LOG_RETENTION_DAYS
+    const deleted = await logService.purgeOlderThan(retentionDays)
+    log.info({ deleted, retentionDays }, 'Purged old log entries')
   }, { connection: bullmqConnection })
 
   purgeWorker.on('failed', (job, err) => {

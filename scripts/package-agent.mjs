@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 /**
- * Packages the pre-bundled deploy-agent into a tarball.
- * Run via `pnpm package:agent` — esbuild must have already written dist-bundle/index.js.
+ * Bundles and packages the deploy-agent into a tarball.
+ * Run via `pnpm package:agent`.
  * Output: apps/control-plane/agent-bundle.tar.gz
  */
 import { execSync } from 'child_process'
-import { existsSync } from 'fs'
+import { readFileSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
+import { createRequire } from 'module'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(__dirname, '..')
@@ -15,10 +16,30 @@ const agentDir = resolve(repoRoot, 'apps/deploy-agent')
 const bundleDir = resolve(agentDir, 'dist-bundle')
 const outFile = resolve(repoRoot, 'apps/control-plane/agent-bundle.tar.gz')
 
-if (!existsSync(resolve(bundleDir, 'index.js'))) {
-  console.error('✗ apps/deploy-agent/dist-bundle/index.js not found — esbuild step must have failed')
-  process.exit(1)
-}
+// Resolve esbuild from the agent package's own devDependencies
+const requireFromAgent = createRequire(resolve(agentDir, 'package.json'))
+const { build } = requireFromAgent('esbuild')
+
+const pkg = JSON.parse(readFileSync(resolve(agentDir, 'package.json'), 'utf8'))
+const version = pkg.version
+
+console.log(`→ Bundling deploy-agent v${version}…`)
+
+await build({
+  entryPoints: [resolve(agentDir, 'src/index.ts')],
+  bundle: true,
+  platform: 'node',
+  target: 'node22',
+  format: 'esm',
+  external: ['node:*'],
+  banner: {
+    js: "import{createRequire}from'module';const require=createRequire(import.meta.url);",
+  },
+  define: {
+    __AGENT_VERSION__: JSON.stringify(version),
+  },
+  outfile: resolve(bundleDir, 'index.js'),
+})
 
 console.log('→ Packaging tarball…')
 
@@ -33,4 +54,4 @@ execSync(
   { stdio: 'inherit', env: { ...process.env, COPYFILE_DISABLE: '1' } },
 )
 
-console.log(`✓ Agent bundle written to ${outFile}`)
+console.log(`✓ Agent bundle v${version} written to ${outFile}`)

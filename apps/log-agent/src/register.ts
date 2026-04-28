@@ -2,7 +2,8 @@ import { LogAgentRegisterResponseSchema } from '@ninja/types'
 import { config } from './config.js'
 import { log } from './logger.js'
 
-const VERSION = '0.1.0'
+declare const __AGENT_VERSION__: string
+const VERSION = __AGENT_VERSION__
 
 async function attempt(): Promise<{ agentId: string; token: string } | null> {
   try {

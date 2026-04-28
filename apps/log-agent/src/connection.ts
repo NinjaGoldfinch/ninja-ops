@@ -5,6 +5,7 @@ import { config } from './config.js'
 import { log as rootLog } from './logger.js'
 import { startJournal } from './journal.js'
 import { startHeartbeat, stopHeartbeat } from './heartbeat.js'
+import { register } from './register.js'
 
 const log = rootLog.child({ component: 'ws' })
 
@@ -13,6 +14,7 @@ let agentIdRef = ''
 let tokenRef = ''
 let stopJournal: (() => void) | null = null
 let reconnectScheduled = false
+let needsRefresh = false
 
 export function send(msg: LogAgentClientMessage): void {
   if (ws?.readyState === WebSocket.OPEN) {
@@ -30,8 +32,18 @@ function scheduleReconnect(): void {
   if (reconnectScheduled) return
   reconnectScheduled = true
   setTimeout(() => {
-    reconnectScheduled = false
-    startConnection(agentIdRef, tokenRef)
+    void (async () => {
+      reconnectScheduled = false
+      if (needsRefresh) {
+        log.info('Refreshing agent credentials before reconnect')
+        const fresh = await register()
+        agentIdRef = fresh.agentId
+        tokenRef = fresh.token
+        needsRefresh = false
+        log.info('Credentials refreshed', { agentId: fresh.agentId })
+      }
+      startConnection(agentIdRef, tokenRef)
+    })()
   }, config.RECONNECT_DELAY_MS)
 }
 
@@ -90,6 +102,9 @@ export function startConnection(agentId: string, token: string): void {
 
     if (msg.type === 'error') {
       log.warn('Error from server', { code: msg.code, message: msg.message })
+      if (msg.code === 'UNAUTHORIZED') {
+        needsRefresh = true
+      }
     }
   })
 

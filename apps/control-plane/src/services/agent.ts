@@ -68,7 +68,7 @@ export class AgentService {
       sub: row.id,
       username: `agent:${row.id}`,
       role: 'viewer',
-    })
+    }, config.AGENT_JWT_EXPIRY)
 
     return { agentId: row.id, token }
   }
@@ -121,6 +121,16 @@ export class AgentService {
       RETURNING id, node_id, vmid, hostname, version, kind, status, last_seen_at, registered_at
     `
     if (rows[0]) sessionManager.broadcastAgentStatus(toAgent(rows[0]))
+  }
+
+  async getById(id: string): Promise<Agent | null> {
+    const rows = await sql<DbAgent[]>`
+      SELECT id, node_id, vmid, hostname, version, kind, status, last_seen_at, registered_at
+      FROM agents
+      WHERE id = ${id}
+    `
+    const row = rows[0]
+    return row ? toAgent(row) : null
   }
 
   async getAgentForVmid(nodeId: string, vmid: number): Promise<Agent | null> {

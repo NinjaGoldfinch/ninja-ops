@@ -44,6 +44,7 @@ type FilterAction =
   | { type: 'SET_VMID'; vmid: number | null }
   | { type: 'TOGGLE_LEVEL'; level: string }
   | { type: 'TOGGLE_SOURCE'; source: string }
+  | { type: 'SET_UNITS'; units: string[] }
   | { type: 'SET_SEARCH'; search: string }
   | { type: 'TOGGLE_SEARCH_MODE' }
   | { type: 'SET_RANGE'; from: number | null; to: number | null }
@@ -82,6 +83,8 @@ function filterReducer(state: FilterState, action: FilterAction): FilterState {
           ? state.sources.filter((s) => s !== action.source)
           : [...state.sources, action.source],
       }
+    case 'SET_UNITS':
+      return { ...state, units: action.units }
     case 'SET_SEARCH':
       return { ...state, search: action.search }
     case 'TOGGLE_SEARCH_MODE':
@@ -106,6 +109,17 @@ function filterToQueryParams(f: FilterState): Partial<LogQueryParams> {
   if (f.from) p.from = f.from
   if (f.to) p.to = f.to
   return p
+}
+
+// ── Debounce helper ───────────────────────────────────────────────────────────
+
+function useDebouncedValue<T>(value: T, ms: number): T {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), ms)
+    return () => clearTimeout(id)
+  }, [value, ms])
+  return debounced
 }
 
 // ── Level colors ──────────────────────────────────────────────────────────────
@@ -187,6 +201,23 @@ function SourceSelect({ selected, onToggle }: { selected: string[]; onToggle: (s
   )
 }
 
+function UnitInput({ units, onChange }: { units: string[]; onChange: (units: string[]) => void }) {
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs">Units</Label>
+      <Input
+        value={units.join(', ')}
+        onChange={(e) => {
+          const parsed = e.target.value.split(',').map((s) => s.trim()).filter(Boolean)
+          onChange(parsed)
+        }}
+        placeholder="e.g. nginx, sshd"
+        className="text-xs font-mono"
+      />
+    </div>
+  )
+}
+
 function DateRangeBar({ from, to, onChange }: {
   from: number | null
   to: number | null
@@ -200,6 +231,12 @@ function DateRangeBar({ from, to, onChange }: {
     { label: '7d',  ms: 7 * 24 * 60 * 60_000 },
   ]
   const now = Date.now()
+
+  const msToDateTimeLocal = (ms: number) => {
+    const d = new Date(ms)
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
+    return d.toISOString().slice(0, 16)
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-1">
@@ -220,6 +257,19 @@ function DateRangeBar({ from, to, onChange }: {
           </button>
         )
       })}
+      <input
+        type="datetime-local"
+        className="text-xs bg-zinc-900 border border-zinc-700 rounded px-1.5 py-0.5 text-zinc-300"
+        value={from !== null ? msToDateTimeLocal(from) : ''}
+        onChange={(e) => onChange(e.target.value ? new Date(e.target.value).getTime() : null, to)}
+      />
+      <span className="text-xs text-zinc-600">–</span>
+      <input
+        type="datetime-local"
+        className="text-xs bg-zinc-900 border border-zinc-700 rounded px-1.5 py-0.5 text-zinc-300"
+        value={to !== null ? msToDateTimeLocal(to) : ''}
+        onChange={(e) => onChange(from, e.target.value ? new Date(e.target.value).getTime() : null)}
+      />
       {(from !== null || to !== null) && (
         <button
           type="button"
@@ -531,7 +581,8 @@ function LogsPage() {
   const { data: guests } = useGuests(filter.nodeId ?? '')
   const { list: savedFiltersList, remove: removeFilter } = useSavedFilters()
 
-  const queryParams = filterToQueryParams(filter)
+  const debouncedSearch = useDebouncedValue(filter.search, 300)
+  const queryParams = filterToQueryParams({ ...filter, search: debouncedSearch })
 
   const { data: histPages, fetchNextPage, hasNextPage, isFetchingNextPage, isFetching } = useLogs(queryParams)
   const histRows = histPages?.pages.flatMap((p) => p.rows) ?? []
@@ -544,6 +595,8 @@ function LogsPage() {
   if (queryParams.levels) statsParams.levels = queryParams.levels
   if (queryParams.from) statsParams.from = queryParams.from
   if (queryParams.to) statsParams.to = queryParams.to
+
+  const { data: statsData } = useLogStats(statsParams)
 
   const toggleLive = () => {
     if (isLive) { stopLive(); setIsLive(false) }
@@ -674,6 +727,11 @@ function LogsPage() {
               onToggle={(s) => dispatch({ type: 'TOGGLE_SOURCE', source: s })}
             />
 
+            <UnitInput
+              units={filter.units}
+              onChange={(units) => dispatch({ type: 'SET_UNITS', units })}
+            />
+
             <div className="space-y-1 lg:col-span-2">
               <Label className="text-xs" htmlFor="log-search">Search</Label>
               <div className="flex gap-1">
@@ -739,7 +797,7 @@ function LogsPage() {
         open={showExport}
         onClose={() => setShowExport(false)}
         params={queryParams}
-        totalCount={0}
+        totalCount={statsData?.totalCount ?? 0}
       />
 
       <SaveFilterModal

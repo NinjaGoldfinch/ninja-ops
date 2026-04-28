@@ -40,3 +40,8 @@ docker/volumes/
 *.pem
 *.key
 *.p12
+
+# Build artifacts / bundles
+*.tar.gz
+apps/deploy-agent/dist-bundle/
+apps/log-agent/dist-bundle/
