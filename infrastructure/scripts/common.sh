@@ -228,17 +228,42 @@ prompt_default() {
 # ── Flag parsing ─────────────────────────────────────────────────────────────
 OPT_YES=${OPT_YES:-0}
 OPT_FORCE=${OPT_FORCE:-0}
-OPT_USE_ENV=${OPT_USE_ENV:-0}
 
-parse_common_flags() {
-  for _arg in "$@"; do
-    case "$_arg" in
-      --yes|-y)   OPT_YES=1 ;;
-      --force)    OPT_FORCE=1 ;;
-      --use-env)  OPT_USE_ENV=1 ;;
-      --help|-h)  show_help; exit 0 ;;
+# ── Env file loading ─────────────────────────────────────────────────────────
+# load_env_file <path> — sources an env file, exporting all vars.
+# Only sets variables; does not override vars already present in the environment.
+load_env_file() {
+  local _f="$1"
+  [ -f "$_f" ] || die "Env file not found: $_f"
+  log_info "Loading env file: $_f"
+  while IFS= read -r _line || [ -n "$_line" ]; do
+    # Strip inline comments and skip blank lines / comment lines
+    case "$_line" in ''|'#'*) continue ;; esac
+    _line="${_line%%#*}"          # strip trailing comment
+    _line="${_line%"${_line##*[![:space:]]}"}"  # rtrim whitespace
+    [ -z "$_line" ] && continue
+    _k="${_line%%=*}"
+    _v="${_line#*=}"
+    # Strip surrounding quotes from the value
+    case "$_v" in
+      '"'*'"')  _v="${_v#\"}"; _v="${_v%\"}" ;;
+      "'"*"'")  _v="${_v#\'}"; _v="${_v%\'}" ;;
     esac
-  done
+    # Only export if not already set in the environment
+    eval "[ -n \"\${${_k}+x}\" ]" || export "${_k}=${_v}"
+  done < "$_f"
+  log_ok "Loaded: $_f"
+}
+
+# load_env_auto — loads ninja-ops.env from cwd if present and --env was not given
+load_env_auto() {
+  local _explicit="${1:-}"
+  if [ -n "$_explicit" ]; then
+    load_env_file "$_explicit"
+  elif [ -f "./ninja-ops.env" ]; then
+    log_info "Auto-detected ./ninja-ops.env"
+    load_env_file "./ninja-ops.env"
+  fi
 }
 
 # ── Box drawing ──────────────────────────────────────────────────────────────

@@ -169,7 +169,17 @@ curl -sSL "${RAW}/infrastructure/scripts/setup-nginx.sh" -o setup-nginx.sh
 bash setup-nginx.sh
 ```
 
-Each script shows a confirmation summary before provisioning. Pass `--yes` to skip it, `--force` to destroy and recreate an existing container. To re-run a single step later:
+Each script shows a confirmation summary before provisioning. Pass `--yes` to skip it, `--force` to destroy and recreate an existing container.
+
+All scripts accept `--env <file>` to load a `ninja-ops.env` file directly, and auto-detect `ninja-ops.env` in the current directory if the flag is omitted. Shell environment variables always take priority over values in the file.
+
+To re-run a single step later:
+
+```bash
+bash setup-control-plane.sh --env ninja-ops.env --force
+```
+
+Or source the env file manually if you prefer the old approach:
 
 ```bash
 set -a; source ninja-ops.env; set +a

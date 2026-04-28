@@ -147,6 +147,8 @@ if [ "${_NINJA_COMMON_LOADED:-}" != "1" ]; then
     printf '%sProceed with these settings? [Y/n]:%s ' "$C_YLW" "$C_RST" >/dev/tty; read -r _c </dev/tty
     case "$_c" in n|N|no|NO) die "Aborted." ;; *) return 0 ;; esac
   }
+  load_env_file() { local _f="$1" _line _k _v; [ -f "$_f" ] || die "Env file not found: $_f"; log_info "Loading env file: $_f"; while IFS= read -r _line || [ -n "$_line" ]; do case "$_line" in ''|'#'*) continue ;; esac; _line="${_line%%#*}"; _line="${_line%"${_line##*[![:space:]]}"}"; [ -z "$_line" ] && continue; _k="${_line%%=*}"; _v="${_line#*=}"; case "$_v" in '"'*'"') _v="${_v#\"}"; _v="${_v%\"}" ;; "'"*"'") _v="${_v#\'}"; _v="${_v%\'}" ;; esac; eval "[ -n \"\${${_k}+x}\" ]" || export "${_k}=${_v}"; done < "$_f"; log_ok "Loaded: $_f"; }
+  load_env_auto() { local _e="${1:-}"; if [ -n "$_e" ]; then load_env_file "$_e"; elif [ -f "./ninja-ops.env" ]; then log_info "Auto-detected ./ninja-ops.env"; load_env_file "./ninja-ops.env"; fi; }
 fi
 
 # ── Help ─────────────────────────────────────────────────────────────────────
@@ -161,9 +163,10 @@ dist/ is transferred to this container and served by `serve` on port 8080.
 Run setup-control-plane.sh before this script.
 
 Options:
-  --yes, -y    Skip confirmation prompt
-  --force      Recreate container if it already exists
-  --help, -h   Show this help message
+  --yes, -y        Skip confirmation prompt
+  --force          Recreate container if it already exists
+  --env <file>     Load settings from a ninja-ops.env file
+  --help, -h       Show this help message
 
 Environment variables (all optional):
   CT_ID              Dashboard container ID (default: 203)
@@ -192,14 +195,18 @@ EOF
 }
 
 # ── Parse flags ──────────────────────────────────────────────────────────────
-for _arg in "$@"; do
-  case "$_arg" in
+_ENV_FILE=""
+while [ $# -gt 0 ]; do
+  case "$1" in
     --yes|-y)    OPT_YES=1 ;;
     --force)     OPT_FORCE=1 ;;
+    --env)       shift; [ -n "${1:-}" ] || die "--env requires a file path"; _ENV_FILE="$1" ;;
     --help|-h)   show_help; exit 0 ;;
-    *) die "Unknown option: $_arg (use --help)" ;;
+    *) die "Unknown option: $1 (use --help)" ;;
   esac
+  shift
 done
+load_env_auto "$_ENV_FILE"
 
 # ── Defaults ─────────────────────────────────────────────────────────────────
 CT_ID="${DASH_CT_ID:-103}"
