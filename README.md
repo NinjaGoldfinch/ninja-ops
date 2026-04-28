@@ -648,8 +648,8 @@ Migrations run in filename order. If a newer migration references a table from a
 ```bash
 pct exec 102 -- bash -c "
   cd /opt/ninja-ops && \
-  DATABASE_URL=\$(grep DATABASE_URL /etc/ninja-ops/control-plane.env | cut -d= -f2-) \
-  sudo -E -u ninja pnpm --filter @ninja/control-plane db:migrate
+  sudo -H -E -u ninja DATABASE_URL=\$(grep DATABASE_URL /etc/ninja-ops/control-plane.env | cut -d= -f2-) \
+    pnpm --filter @ninja/control-plane db:migrate
 "
 ```
 
