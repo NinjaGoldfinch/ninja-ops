@@ -227,7 +227,8 @@ All scripts accept `--yes` (skip prompt), `--force` (destroy and recreate), and 
 ```bash
 pct exec 102 -- bash -c "
   cd /opt/ninja-ops && \
-  sudo -u ninja git pull && \
+  sudo -u ninja git fetch origin && \
+  sudo -u ninja git reset --hard origin/main && \
   sudo -u ninja pnpm install --frozen-lockfile && \
   sudo -u ninja pnpm --filter @ninja/types build && \
   sudo -u ninja pnpm --filter @ninja/control-plane build && \
@@ -247,7 +248,8 @@ Build on CT 102, transfer to CT 103 — the control plane never restarts.
 # Build on the control plane (VITE_API_URL empty = same-origin via nginx)
 pct exec 102 -- bash -c "
   cd /opt/ninja-ops && \
-  sudo -u ninja git pull && \
+  sudo -u ninja git fetch origin && \
+  sudo -u ninja git reset --hard origin/main && \
   sudo -u ninja pnpm install --frozen-lockfile && \
   sudo -u ninja pnpm --filter @ninja/types build && \
   VITE_API_URL= sudo -u ninja pnpm --filter @ninja/dashboard build && \
