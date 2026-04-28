@@ -598,6 +598,16 @@ pct exec 102 -- journalctl -u ninja-control-plane -n 30 --no-pager
 
 `ENCRYPTION_KEY` must be exactly 64 hex characters. `DATABASE_URL` must start with `postgres://`.
 
+**pnpm permission errors — `EACCES /root/.local/share/pnpm`**
+
+A stale temp directory from a previous failed pnpm install is blocking writes. Remove it and retry:
+
+```bash
+pct exec 102 -- rm -rf /root/.local/share/pnpm/.tools
+```
+
+If this recurs, re-provision the container with `bash setup-control-plane.sh --force` so pnpm is installed under the `ninja` user's home directory rather than root's.
+
 **Control plane won't start — can't connect to PostgreSQL or Redis**
 
 ```bash

@@ -315,15 +315,21 @@ exec_ct "$CT_ID" "curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x 
   apt-get install -y -qq nodejs"
 log_ok "Node.js $(exec_ct "$CT_ID" "node --version") installed"
 
-# ── pnpm ─────────────────────────────────────────────────────────────────────
-log_info "Installing pnpm..."
-exec_ct "$CT_ID" "npm install -g pnpm"
-log_ok "pnpm installed"
-
 # ── Service user ─────────────────────────────────────────────────────────────
 log_info "Creating service user: $SERVICE_USER..."
 exec_ct "$CT_ID" "id -u ${SERVICE_USER} >/dev/null 2>&1 || useradd -m -r -s /bin/bash ${SERVICE_USER}"
 log_ok "Service user ready"
+
+# ── pnpm ─────────────────────────────────────────────────────────────────────
+log_info "Installing pnpm..."
+exec_ct "$CT_ID" "
+  export PNPM_HOME=/home/${SERVICE_USER}/.local/share/pnpm
+  export PATH=\"\$PNPM_HOME:\$PATH\"
+  curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=10 HOME=/home/${SERVICE_USER} bash -
+  chown -R ${SERVICE_USER}:${SERVICE_USER} /home/${SERVICE_USER}/.local
+  ln -sf /home/${SERVICE_USER}/.local/share/pnpm/pnpm /usr/local/bin/pnpm
+"
+log_ok "pnpm installed"
 
 # ── Clone repository ─────────────────────────────────────────────────────────
 log_info "Cloning repository (branch: $REPO_BRANCH)..."
