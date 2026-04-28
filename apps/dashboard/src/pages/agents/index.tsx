@@ -37,8 +37,8 @@ function AgentsPage() {
 
   const isOutdated = (agent: Agent): boolean => {
     if (!bundleInfo) return false
-    const expected = agent.kind === 'log' ? bundleInfo.logAgentHash : bundleInfo.deployAgentHash
-    return agent.bundleHash !== expected
+    const expected = agent.kind === 'log' ? bundleInfo.logAgentVersion : bundleInfo.deployAgentVersion
+    return agent.version !== expected
   }
 
   const handleRedeploy = (agent: Agent) => {
@@ -123,7 +123,7 @@ function AgentsPage() {
                         {agent.vmid}
                       </td>
                       <td className="px-4 py-2.5 font-mono text-xs text-zinc-500 dark:text-zinc-400">
-                        <span title={agent.bundleHash}>{agent.bundleHash.slice(0, 12)}</span>
+                        <span>{agent.version}</span>
                         {outdated && (
                           <span className="ml-2 inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400">
                             Update available

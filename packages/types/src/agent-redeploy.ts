@@ -38,7 +38,7 @@ export type EnqueueAllRequest = z.infer<typeof EnqueueAllRequestSchema>
 // ── Bundle info ───────────────────────────────────────────────────────────
 
 export const BundleInfoSchema = z.object({
-  deployAgentHash: z.string(),
-  logAgentHash:    z.string(),
+  deployAgentVersion: z.string(),
+  logAgentVersion:    z.string(),
 })
 export type BundleInfo = z.infer<typeof BundleInfoSchema>

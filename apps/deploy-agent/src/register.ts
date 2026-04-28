@@ -2,6 +2,9 @@ import { AgentRegisterResponseSchema } from '@ninja/types'
 import { config } from './config.js'
 import { log } from './logger.js'
 
+declare const __AGENT_VERSION__: string
+const VERSION = __AGENT_VERSION__
+
 async function attempt(): Promise<{ agentId: string; token: string } | null> {
   try {
     const res = await fetch(`${config.CONTROL_PLANE_URL}/api/agents/register`, {
@@ -11,7 +14,7 @@ async function attempt(): Promise<{ agentId: string; token: string } | null> {
         nodeId: config.NODE_ID,
         vmid: config.VMID,
         hostname: config.HOSTNAME,
-        bundleHash: config.AGENT_BUNDLE_HASH,
+        version: VERSION,
         secret: config.AGENT_SECRET,
       }),
     })

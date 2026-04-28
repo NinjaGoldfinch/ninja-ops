@@ -77,11 +77,11 @@ export type LogSubscription = z.infer<typeof LogSubscriptionSchema>
 // ── Log agent registration ────────────────────────────────────────────────
 
 export const LogAgentRegisterRequestSchema = z.object({
-  nodeId:     z.string().uuid(),
-  vmid:       z.number().int().positive(),
-  secret:     z.string().min(32),
-  bundleHash: z.string(),
-  hostname:   z.string().optional(),
+  nodeId:   z.string().uuid(),
+  vmid:     z.number().int().positive(),
+  secret:   z.string().min(32),
+  version:  z.string(),
+  hostname: z.string().optional(),
 })
 export type LogAgentRegisterRequest = z.infer<typeof LogAgentRegisterRequestSchema>
 

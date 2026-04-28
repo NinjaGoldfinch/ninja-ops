@@ -1,25 +1,20 @@
-import { createHash } from 'node:crypto'
-import { readFileSync, existsSync } from 'node:fs'
-import { config } from '../config.js'
+import { readFileSync } from 'node:fs'
+import { resolve, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { BundleInfo } from '@ninja/types'
 
-function computeHash(filePath: string): string {
-  if (!existsSync(filePath)) return 'no-bundle'
-  return createHash('sha256').update(readFileSync(filePath)).digest('hex')
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..')
+
+function readVersion(relPath: string): string {
+  const pkg = JSON.parse(readFileSync(resolve(repoRoot, relPath), 'utf8')) as { version: string }
+  return pkg.version
 }
 
-let _info: BundleInfo | null = null
+const _info: BundleInfo = {
+  deployAgentVersion: readVersion('apps/deploy-agent/package.json'),
+  logAgentVersion:    readVersion('apps/log-agent/package.json'),
+}
 
 export function getBundleVersions(): BundleInfo {
-  if (!_info) {
-    _info = {
-      deployAgentHash: computeHash(config.AGENT_BUNDLE_PATH),
-      logAgentHash:    computeHash(config.LOG_AGENT_BUNDLE_PATH),
-    }
-  }
   return _info
-}
-
-export function invalidateBundleVersions(): void {
-  _info = null
 }

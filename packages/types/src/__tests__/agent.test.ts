@@ -27,8 +27,7 @@ describe('AgentSchema', () => {
     nodeId: crypto.randomUUID(),
     vmid: 100,
     hostname: 'skyblock-api-01',
-    bundleHash: 'abc123deadbeef',
-    kind: 'deploy',
+    version: '1.0.0',
     status: 'idle',
     lastSeenAt: new Date().toISOString(),
     registeredAt: new Date().toISOString(),
@@ -53,7 +52,7 @@ describe('AgentRegisterRequestSchema', () => {
       nodeId: crypto.randomUUID(),
       vmid: 100,
       hostname: 'host-01',
-      bundleHash: 'abc123deadbeef',
+      version: '1.0.0',
       secret: 'a'.repeat(32),
     })
     expect(result.success).toBe(true)
@@ -64,7 +63,7 @@ describe('AgentRegisterRequestSchema', () => {
       nodeId: crypto.randomUUID(),
       vmid: 100,
       hostname: 'host-01',
-      bundleHash: 'abc123deadbeef',
+      version: '1.0.0',
       secret: 'tooshort',
     })
     expect(result.success).toBe(false)

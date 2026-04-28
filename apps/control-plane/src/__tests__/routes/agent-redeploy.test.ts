@@ -15,8 +15,8 @@ vi.mock('../../services/agent-redeploy.js', () => ({
 
 vi.mock('../../services/bundle-versions.js', () => ({
   getBundleVersions: vi.fn().mockReturnValue({
-    deployAgentHash: 'abc123',
-    logAgentHash: 'def456',
+    deployAgentVersion: '0.2.0',
+    logAgentVersion: '0.1.0',
   }),
 }))
 
@@ -63,9 +63,9 @@ describe('GET /api/agents/bundle-info', () => {
     })
 
     expect(res.statusCode).toBe(200)
-    const body = JSON.parse(res.body) as { ok: boolean; data: { deployAgentHash: string; logAgentHash: string } }
+    const body = JSON.parse(res.body) as { ok: boolean; data: { deployAgentVersion: string; logAgentVersion: string } }
     expect(body.ok).toBe(true)
-    expect(body.data.deployAgentHash).toBe('abc123')
+    expect(body.data.deployAgentVersion).toBe('0.2.0')
   })
 
   it('returns 200 for admin', async () => {

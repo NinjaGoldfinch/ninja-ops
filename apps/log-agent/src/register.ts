@@ -2,17 +2,20 @@ import { LogAgentRegisterResponseSchema } from '@ninja/types'
 import { config } from './config.js'
 import { log } from './logger.js'
 
+declare const __AGENT_VERSION__: string
+const VERSION = __AGENT_VERSION__
+
 async function attempt(): Promise<{ agentId: string; token: string } | null> {
   try {
     const res = await fetch(`${config.CONTROL_PLANE_URL}/api/log-agents/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        nodeId:     config.NODE_ID,
-        vmid:       config.VMID,
-        bundleHash: config.AGENT_BUNDLE_HASH,
-        secret:     config.AGENT_SECRET,
-        hostname:   config.HOSTNAME,
+        nodeId:   config.NODE_ID,
+        vmid:     config.VMID,
+        version:  VERSION,
+        secret:   config.AGENT_SECRET,
+        hostname: config.HOSTNAME,
       }),
     })
 

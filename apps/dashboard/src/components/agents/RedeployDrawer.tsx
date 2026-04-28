@@ -110,8 +110,8 @@ export function RedeployDrawer({ agent, jobId, onClose }: RedeployDrawerProps) {
     ? allJobs.filter(j => j.state === 'queued' && j.queuedAt < job.queuedAt).length + 1
     : null
 
-  const expectedHash = bundleInfo
-    ? (agent.kind === 'log' ? bundleInfo.logAgentHash : bundleInfo.deployAgentHash)
+  const expectedVersion = bundleInfo
+    ? (agent.kind === 'log' ? bundleInfo.logAgentVersion : bundleInfo.deployAgentVersion)
     : null
 
   const recentJobs = agentJobs?.filter(j => j.id !== jobId).slice(0, 5) ?? []
@@ -166,19 +166,19 @@ export function RedeployDrawer({ agent, jobId, onClose }: RedeployDrawerProps) {
           )}
 
           {/* Version info */}
-          {expectedHash && (
+          {expectedVersion && (
             <div className="rounded border border-zinc-800 divide-y divide-zinc-800 text-xs">
               <div className="flex items-center justify-between px-3 py-2">
                 <span className="text-zinc-500">Current</span>
-                <span className="font-mono text-zinc-400">{agent.bundleHash.slice(0, 12)}</span>
+                <span className="font-mono text-zinc-400">{agent.version}</span>
               </div>
               <div className="flex items-center justify-between px-3 py-2">
                 <span className="text-zinc-500">Target</span>
                 <span className={cn(
                   'font-mono',
-                  expectedHash === agent.bundleHash ? 'text-zinc-400' : 'text-blue-400',
+                  expectedVersion === agent.version ? 'text-zinc-400' : 'text-blue-400',
                 )}>
-                  {expectedHash.slice(0, 12)}
+                  {expectedVersion}
                 </span>
               </div>
             </div>
