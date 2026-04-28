@@ -152,10 +152,6 @@ async function runServiceRedeployJob(jobId: string): Promise<void> {
   if (!row) throw new Error(`Service redeploy job ${jobId} not found`)
   if (row.state === 'cancelled') return
 
-  if (!config.SELF_DEPLOY_HOST) {
-    throw AppError.internal('SELF_DEPLOY_HOST is not configured')
-  }
-
   const service = row.service as ServiceName
   const unit = SERVICE_UNITS[service]
   const workDir = SERVICE_DIRS[service]
@@ -165,6 +161,9 @@ async function runServiceRedeployJob(jobId: string): Promise<void> {
   await transition(jobId, 'running')
 
   try {
+    if (!config.SELF_DEPLOY_HOST) {
+      throw AppError.internal('SELF_DEPLOY_HOST is not configured')
+    }
     // For control-plane: mark success before restart because the process dies mid-job.
     // The new process picks up the already-completed job state on startup.
     // Error detection during the restart itself is sacrificed for simplicity.
