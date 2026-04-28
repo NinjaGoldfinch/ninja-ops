@@ -1,5 +1,5 @@
 import { Queue, Worker } from 'bullmq'
-import { bullmqConnection, redis } from '../db/redis.js'
+import { bullmqConnection } from '../db/redis.js'
 import { sql } from '../db/client.js'
 import { childLogger } from '../lib/logger.js'
 import { nodeService } from '../services/node.js'
@@ -8,6 +8,7 @@ import { deployAgentIntoLxc, deployLogAgentIntoLxc } from '../services/agent-dep
 import { JobLogger } from '../services/job-logger.js'
 import { sessionManager } from '../ws/session.js'
 import { AppError } from '../errors.js'
+import { acquireNodeLock, releaseNodeLock } from '../lib/node-lock.js'
 import type { AgentRedeployJob, AgentRedeployState } from '@ninja/types'
 
 const log = childLogger('agent-redeploy-runner')
@@ -75,20 +76,6 @@ async function transition(
   return job
 }
 
-// ── Redis lock helpers ────────────────────────────────────────────────────
-
-function lockKey(nodeId: string): string {
-  return `redeploy:node:${nodeId}`
-}
-
-async function acquireLock(nodeId: string, jobId: string): Promise<boolean> {
-  const result = await redis.set(lockKey(nodeId), jobId, 'EX', 1800, 'NX')
-  return result === 'OK'
-}
-
-async function releaseLock(nodeId: string): Promise<void> {
-  await redis.del(lockKey(nodeId))
-}
 
 // ── Job processor ─────────────────────────────────────────────────────────
 
@@ -131,11 +118,11 @@ async function runRedeployJob(jobId: string): Promise<void> {
     sshKeyPassphrase,
   }
 
-  // Attempt to acquire per-node mutex — serializes jobs on the same Proxmox node
-  const locked = await acquireLock(agent.nodeId, jobId)
+  // Attempt to acquire per-node mutex — serializes agent deploys on the same Proxmox node.
+  // Throws immediately on contention so BullMQ retries the job.
+  const locked = await acquireNodeLock(agent.nodeId, jobId)
   if (!locked) {
-    // Another job on this node is running — signal BullMQ to retry
-    throw new Error(`Node ${agent.nodeId} is locked by another redeploy — will retry`)
+    throw new Error(`Node ${agent.nodeId} is locked by another agent deploy — will retry`)
   }
 
   try {
@@ -160,7 +147,7 @@ async function runRedeployJob(jobId: string): Promise<void> {
     await transition(jobId, 'failed', { errorMessage }).catch(() => undefined)
     throw err
   } finally {
-    await releaseLock(agent.nodeId)
+    await releaseNodeLock(agent.nodeId)
   }
 }
 

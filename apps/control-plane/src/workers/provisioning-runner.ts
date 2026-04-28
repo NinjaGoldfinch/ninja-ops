@@ -7,6 +7,7 @@ const log = childLogger('provisioning-runner')
 import { proxmoxService } from '../services/proxmox.js'
 import { nodeService } from '../services/node.js'
 import { deployAgentIntoLxc, deployLogAgentIntoLxc } from '../services/agent-deployer.js'
+import { withNodeLock } from '../lib/node-lock.js'
 import { JobLogger } from '../services/job-logger.js'
 import { sessionManager } from '../ws/session.js'
 import { AppError } from '../errors.js'
@@ -145,17 +146,19 @@ async function runProvisioningJob(jobId: string): Promise<void> {
   if (row.guest_type === 'lxc' && (row.deploy_agent || row.deploy_log_agent)) {
     await transition(jobId, 'deploying')
 
-    if (row.deploy_agent) {
-      const logger = new JobLogger('provisioning', jobId)
-      await deployAgentIntoLxc(cfg, row.vmid, row.node_id, logger)
-      await logger.flush()
-    }
+    await withNodeLock(row.node_id, jobId, async () => {
+      if (row.deploy_agent) {
+        const logger = new JobLogger('provisioning', jobId)
+        await deployAgentIntoLxc(cfg, row.vmid, row.node_id, logger)
+        await logger.flush()
+      }
 
-    if (row.deploy_log_agent) {
-      const logger = new JobLogger('log_agent_deploy', `${row.node_id}/${row.vmid}`)
-      await deployLogAgentIntoLxc(cfg, row.vmid, row.node_id, '', logger)
-      await logger.flush()
-    }
+      if (row.deploy_log_agent) {
+        const logger = new JobLogger('log_agent_deploy', `${row.node_id}/${row.vmid}`)
+        await deployLogAgentIntoLxc(cfg, row.vmid, row.node_id, '', logger)
+        await logger.flush()
+      }
+    })
   }
 
   await transition(jobId, 'done')

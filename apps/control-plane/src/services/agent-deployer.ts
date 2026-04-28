@@ -100,7 +100,7 @@ export async function deployAgentIntoLxc(
       ['bash', '-c',
         'apt-get update -qq && apt-get install -y -qq curl && ' +
         'curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && ' +
-        'apt-get install -y -qq nodejs',
+        'apt-get install -y -qq -o DPkg::Lock::Timeout=60 nodejs',
       ],
       'install Node.js 22',
       logger,
@@ -210,7 +210,7 @@ export async function deployLogAgentIntoLxc(
       ['bash', '-c',
         'apt-get update -qq && apt-get install -y -qq curl && ' +
         'curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && ' +
-        'apt-get install -y -qq nodejs',
+        'apt-get install -y -qq -o DPkg::Lock::Timeout=60 nodejs',
       ],
       'install Node.js 22',
       logger,
