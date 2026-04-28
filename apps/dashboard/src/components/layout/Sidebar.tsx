@@ -12,9 +12,11 @@ import {
   Stethoscope,
   PlusSquare,
   ScrollText,
+  Cpu,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUiStore } from '@/stores/ui'
+import { useServiceVersions } from '@/hooks/useServiceRedeploy'
 
 const navItems = [
   { to: '/', label: 'Overview', icon: LayoutDashboard },
@@ -22,6 +24,7 @@ const navItems = [
   { to: '/containers', label: 'Containers', icon: Layers },
   { to: '/provision', label: 'Provision', icon: PlusSquare },
   { to: '/agents', label: 'Agents', icon: Bot },
+  { to: '/services', label: 'Services', icon: Cpu },
   { to: '/audit', label: 'Audit', icon: ClipboardList },
   { to: '/diagnostics', label: 'Diagnostics', icon: Stethoscope },
   { to: '/logs', label: 'Logs', icon: ScrollText },
@@ -30,6 +33,10 @@ const navItems = [
 
 export function Sidebar() {
   const { sidebarCollapsed, toggleSidebar } = useUiStore()
+  const { data: versions } = useServiceVersions()
+  const updatesAvailable = versions
+    ? Object.values(versions).some(v => v.updateAvailable)
+    : false
 
   return (
     <aside
@@ -70,8 +77,20 @@ export function Sidebar() {
               className: 'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50',
             }}
           >
-            <Icon size={16} className="shrink-0" />
-            {!sidebarCollapsed && <span>{label}</span>}
+            <span className="relative shrink-0">
+              <Icon size={16} />
+              {to === '/services' && updatesAvailable && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-yellow-400" />
+              )}
+            </span>
+            {!sidebarCollapsed && (
+              <span className="flex items-center gap-1.5">
+                {label}
+                {to === '/services' && updatesAvailable && !sidebarCollapsed && (
+                  <span className="text-xs text-yellow-500 dark:text-yellow-400">●</span>
+                )}
+              </span>
+            )}
           </Link>
         ))}
       </nav>

@@ -43,6 +43,19 @@ const ConfigSchema = z.object({
   // 1Password service account token — required only when op:// secret references are used
   // for SSH private keys. Get one at: https://developer.1password.com/docs/service-accounts/
   OP_SERVICE_ACCOUNT_TOKEN: z.string().optional(),
+
+  // Self-redeployment: SSH host + key for the machine running control-plane and dashboard
+  SELF_DEPLOY_HOST: z.string().optional(),
+  SELF_DEPLOY_SSH_KEY: z.string().optional(),
+  SERVICE_CONTROL_PLANE_UNIT: z.string().default('ninja-control-plane'),
+  SERVICE_DASHBOARD_UNIT: z.string().default('nginx'),
+  SERVICE_CONTROL_PLANE_DIR: z.string().default('/opt/ninja-ops'),
+  SERVICE_DASHBOARD_DIR: z.string().default('/opt/ninja-ops'),
+
+  // GitHub repo for version polling (e.g. "NinjaGoldfinch/ninja-ops")
+  GITHUB_REPO: z.string().optional(),
+  GITHUB_TOKEN: z.string().optional(),
+  SERVICE_VERSION_POLL_INTERVAL_MS: z.coerce.number().default(30 * 60 * 1000),
 })
 
 const parsed = ConfigSchema.safeParse(process.env)

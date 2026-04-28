@@ -14,6 +14,8 @@ import { startDeployWorker, stopDeployWorker } from './workers/deploy-runner.js'
 import { startProvisioningWorker, stopProvisioningWorker } from './workers/provisioning-runner.js'
 import { startLogPurgeWorker, stopLogPurgeWorker } from './workers/log-purge.js'
 import { startAgentRedeployWorker, stopAgentRedeployWorker } from './workers/agent-redeploy-runner.js'
+import { startServiceRedeployWorker, stopServiceRedeployWorker } from './workers/service-redeploy-runner.js'
+import { startVersionPoller, stopVersionPoller } from './services/service-versions.js'
 
 // Warn early if agent bundles are missing — deployments will fail at the download step
 if (!existsSync(config.AGENT_BUNDLE_PATH)) {
@@ -34,6 +36,8 @@ await startWorkers()
 await startDeployWorker()
 await startProvisioningWorker()
 await startAgentRedeployWorker()
+await startServiceRedeployWorker()
+startVersionPoller()
 await startLogPurgeWorker()
 
 const app = await buildApp()
@@ -45,6 +49,8 @@ const shutdown = async (signal: string) => {
   await stopDeployWorker()
   await stopProvisioningWorker()
   await stopAgentRedeployWorker()
+  await stopServiceRedeployWorker()
+  stopVersionPoller()
   await stopLogPurgeWorker()
   await closeRedis()
   await closeDb()

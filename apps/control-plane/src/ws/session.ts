@@ -1,5 +1,6 @@
 import type { WebSocket } from '@fastify/websocket'
-import type { Role, GuestMetrics, NodeMetrics, DeployJob, DeployLogLine, ProvisioningJob, Agent, LogEntryRow, LogQueryParams, AgentRedeployJob } from '@ninja/types'
+import type { Role, GuestMetrics, NodeMetrics, DeployJob, DeployLogLine, ProvisioningJob, Agent, LogEntryRow, LogQueryParams, AgentRedeployJob, ServiceRedeployJob } from '@ninja/types'
+import type { ServiceVersionCache } from '../services/service-versions.js'
 
 // Looser type that accepts both "key absent" and "key present as undefined"
 // (needed because Zod's .partial() produces `T | undefined` for each field)
@@ -194,6 +195,22 @@ export class SessionManager {
     for (const session of this.sessions.values()) {
       if (session.userId) {
         send(session.ws, { type: 'redeploy_update', data })
+      }
+    }
+  }
+
+  broadcastServiceRedeployUpdate(data: ServiceRedeployJob): void {
+    for (const session of this.sessions.values()) {
+      if (session.userId) {
+        send(session.ws, { type: 'service_redeploy_update', data })
+      }
+    }
+  }
+
+  broadcastServiceVersionUpdate(versions: ServiceVersionCache): void {
+    for (const session of this.sessions.values()) {
+      if (session.userId) {
+        send(session.ws, { type: 'service_version_update', data: versions })
       }
     }
   }

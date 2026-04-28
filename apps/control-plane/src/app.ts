@@ -22,6 +22,7 @@ import provisioningRoutes from './routes/provisioning/index.js'
 import diagnosticsRoutes from './routes/diagnostics/index.js'
 import logRoutes from './routes/logs/index.js'
 import logAgentRoutes from './routes/log-agents/index.js'
+import serviceRoutes from './routes/services/index.js'
 import { registerWebSocket } from './ws/router.js'
 import { registerAgentWebSocket } from './ws/agent-router.js'
 import { registerLogAgentWebSocket } from './ws/log-agent-router.js'
@@ -102,6 +103,7 @@ export async function buildApp() {
   await app.register(diagnosticsRoutes, { prefix: '/api/diagnostics' })
   await app.register(logRoutes, { prefix: '/api/logs' })
   await app.register(logAgentRoutes, { prefix: '/api/log-agents' })
+  await app.register(serviceRoutes, { prefix: '/api/services' })
 
   // WebSocket endpoints
   await app.register(registerWebSocket)

@@ -5,7 +5,6 @@
  * Output: apps/control-plane/agent-bundle.tar.gz
  */
 import { execSync } from 'child_process'
-import { readFileSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { createRequire } from 'module'
@@ -20,10 +19,7 @@ const outFile = resolve(repoRoot, 'apps/control-plane/agent-bundle.tar.gz')
 const requireFromAgent = createRequire(resolve(agentDir, 'package.json'))
 const { build } = requireFromAgent('esbuild')
 
-const pkg = JSON.parse(readFileSync(resolve(agentDir, 'package.json'), 'utf8'))
-const version = pkg.version
-
-console.log(`→ Bundling deploy-agent v${version}…`)
+console.log('→ Bundling deploy-agent…')
 
 await build({
   entryPoints: [resolve(agentDir, 'src/index.ts')],
@@ -34,9 +30,6 @@ await build({
   external: ['node:*'],
   banner: {
     js: "import{createRequire}from'module';const require=createRequire(import.meta.url);",
-  },
-  define: {
-    __AGENT_VERSION__: JSON.stringify(version),
   },
   outfile: resolve(bundleDir, 'index.js'),
 })
@@ -54,4 +47,4 @@ execSync(
   { stdio: 'inherit', env: { ...process.env, COPYFILE_DISABLE: '1' } },
 )
 
-console.log(`✓ Agent bundle v${version} written to ${outFile}`)
+console.log(`✓ Agent bundle written to ${outFile}`)

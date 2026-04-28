@@ -5,6 +5,7 @@ import { LogEntryRowSchema, LogQueryParamsSchema, LogStatsResponseSchema } from 
 import { AgentCommandSchema, AgentHeartbeatSchema, AgentResultSchema, AgentSchema } from './agent.js'
 import { ProvisioningJobSchema } from './provisioning.js'
 import { AgentRedeployJobSchema } from './agent-redeploy.js'
+import { ServiceRedeployJobSchema, ServiceVersionSchema, ServiceNameSchema } from './service-redeploy.js'
 
 // ── Client → Server ───────────────────────────────────────────────────────
 
@@ -169,6 +170,18 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('redeploy_update'),
     data: AgentRedeployJobSchema,
+  }),
+
+  // Service redeploy job state transitions
+  z.object({
+    type: z.literal('service_redeploy_update'),
+    data: ServiceRedeployJobSchema,
+  }),
+
+  // Service version poll result
+  z.object({
+    type: z.literal('service_version_update'),
+    data: z.record(ServiceNameSchema, ServiceVersionSchema),
   }),
 
   // Control-plane log stream

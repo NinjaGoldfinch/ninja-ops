@@ -14,7 +14,7 @@ interface DbAgent {
   node_id: string
   vmid: number
   hostname: string
-  version: string
+  bundle_hash: string
   kind: string
   status: string
   last_seen_at: Date
@@ -27,7 +27,7 @@ function toAgent(row: DbAgent): Agent {
     nodeId: row.node_id,
     vmid: row.vmid,
     hostname: row.hostname,
-    version: row.version,
+    bundleHash: row.bundle_hash,
     kind: (row.kind ?? 'deploy') as Agent['kind'],
     status: row.status as Agent['status'],
     lastSeenAt: row.last_seen_at.toISOString(),
@@ -49,17 +49,17 @@ export class AgentService {
 
     const kind = req.kind ?? 'deploy'
     const hostname = ('hostname' in req && req.hostname) ? req.hostname : `vmid-${req.vmid}`
-    const version = req.version
+    const bundleHash = req.bundleHash
 
     // Upsert agent record (unique on node_id, vmid, kind)
     const rows = await sql<DbAgent[]>`
-      INSERT INTO agents (node_id, vmid, hostname, version, status, kind)
-      VALUES (${req.nodeId}, ${req.vmid}, ${hostname}, ${version}, 'offline', ${kind})
+      INSERT INTO agents (node_id, vmid, hostname, bundle_hash, status, kind)
+      VALUES (${req.nodeId}, ${req.vmid}, ${hostname}, ${bundleHash}, 'offline', ${kind})
       ON CONFLICT (node_id, vmid, kind) DO UPDATE SET
-        hostname      = EXCLUDED.hostname,
-        version       = EXCLUDED.version,
-        last_seen_at  = now()
-      RETURNING id, node_id, vmid, hostname, version, kind, status, last_seen_at, registered_at
+        hostname    = EXCLUDED.hostname,
+        bundle_hash = EXCLUDED.bundle_hash,
+        last_seen_at = now()
+      RETURNING id, node_id, vmid, hostname, bundle_hash, kind, status, last_seen_at, registered_at
     `
     const row = rows[0]
     if (!row) throw AppError.internal('Failed to register agent')
@@ -78,7 +78,7 @@ export class AgentService {
     sql<DbAgent[]>`
       UPDATE agents SET status = 'idle', last_seen_at = now()
       WHERE id = ${agentId}
-      RETURNING id, node_id, vmid, hostname, version, kind, status, last_seen_at, registered_at
+      RETURNING id, node_id, vmid, hostname, bundle_hash, kind, status, last_seen_at, registered_at
     `.then(rows => {
       if (rows[0]) sessionManager.broadcastAgentStatus(toAgent(rows[0]))
     }).catch(
@@ -91,7 +91,7 @@ export class AgentService {
     sql<DbAgent[]>`
       UPDATE agents SET status = 'offline', last_seen_at = now()
       WHERE id = ${agentId}
-      RETURNING id, node_id, vmid, hostname, version, kind, status, last_seen_at, registered_at
+      RETURNING id, node_id, vmid, hostname, bundle_hash, kind, status, last_seen_at, registered_at
     `.then(rows => {
       if (rows[0]) sessionManager.broadcastAgentStatus(toAgent(rows[0]))
     }).catch(
@@ -118,14 +118,14 @@ export class AgentService {
       UPDATE agents
       SET status = ${heartbeat.status}, last_seen_at = now()
       WHERE id = ${heartbeat.agentId}
-      RETURNING id, node_id, vmid, hostname, version, kind, status, last_seen_at, registered_at
+      RETURNING id, node_id, vmid, hostname, bundle_hash, kind, status, last_seen_at, registered_at
     `
     if (rows[0]) sessionManager.broadcastAgentStatus(toAgent(rows[0]))
   }
 
   async getById(id: string): Promise<Agent | null> {
     const rows = await sql<DbAgent[]>`
-      SELECT id, node_id, vmid, hostname, version, kind, status, last_seen_at, registered_at
+      SELECT id, node_id, vmid, hostname, bundle_hash, kind, status, last_seen_at, registered_at
       FROM agents
       WHERE id = ${id}
     `
@@ -135,7 +135,7 @@ export class AgentService {
 
   async getAgentForVmid(nodeId: string, vmid: number): Promise<Agent | null> {
     const rows = await sql<DbAgent[]>`
-      SELECT id, node_id, vmid, hostname, version, kind, status, last_seen_at, registered_at
+      SELECT id, node_id, vmid, hostname, bundle_hash, kind, status, last_seen_at, registered_at
       FROM agents
       WHERE node_id = ${nodeId} AND vmid = ${vmid}
     `
@@ -145,7 +145,7 @@ export class AgentService {
 
   async listAgents(): Promise<Agent[]> {
     const rows = await sql<DbAgent[]>`
-      SELECT id, node_id, vmid, hostname, version, kind, status, last_seen_at, registered_at
+      SELECT id, node_id, vmid, hostname, bundle_hash, kind, status, last_seen_at, registered_at
       FROM agents
       ORDER BY registered_at ASC
     `

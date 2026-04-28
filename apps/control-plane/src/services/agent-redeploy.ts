@@ -21,7 +21,7 @@ interface DbAgentRow {
   id: string
   node_id: string
   kind: string
-  version: string
+  bundle_hash: string
 }
 
 function toJob(row: DbRedeployJob): AgentRedeployJob {
@@ -74,18 +74,18 @@ export class AgentRedeployService {
     // Build agent list, filtering in DB where possible
     const agentRows = await (kind !== undefined
       ? sql<DbAgentRow[]>`
-          SELECT id, node_id, kind, version FROM agents WHERE kind = ${kind as string}
+          SELECT id, node_id, kind, bundle_hash FROM agents WHERE kind = ${kind as string}
         `
       : sql<DbAgentRow[]>`
-          SELECT id, node_id, kind, version FROM agents
+          SELECT id, node_id, kind, bundle_hash FROM agents
         `)
 
     let targets: DbAgentRow[] = agentRows
     if (onlyOutdated) {
-      const { deployAgentVersion, logAgentVersion } = getBundleVersions()
+      const { deployAgentHash, logAgentHash } = getBundleVersions()
       targets = agentRows.filter(a => {
-        const expected = a.kind === 'log' ? logAgentVersion : deployAgentVersion
-        return a.version !== expected
+        const expected = a.kind === 'log' ? logAgentHash : deployAgentHash
+        return a.bundle_hash !== expected
       })
     }
 

@@ -14,7 +14,7 @@ export const AgentSchema = z.object({
   nodeId: z.string().uuid(),
   vmid: z.number().int().positive(),
   hostname: z.string(),
-  version: z.string(),              // semver of the agent package
+  bundleHash: z.string(),
   kind: AgentKindSchema,
   status: AgentStatusSchema,
   lastSeenAt: z.string().datetime(),
@@ -28,7 +28,7 @@ export const AgentRegisterRequestSchema = z.object({
   nodeId: z.string().uuid(),
   vmid: z.number().int().positive(),
   hostname: z.string(),
-  version: z.string(),
+  bundleHash: z.string(),
   secret: z.string().min(32),       // shared secret, set in agent env
 })
 export type AgentRegisterRequest = z.infer<typeof AgentRegisterRequestSchema>

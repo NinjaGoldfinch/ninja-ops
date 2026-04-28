@@ -6,6 +6,7 @@ const ConfigSchema = z.object({
   VMID:                  z.coerce.number().int().positive(),
   CONTROL_PLANE_URL:     z.string().url(),
   AGENT_SECRET:          z.string().min(32),
+  AGENT_BUNDLE_HASH:     z.string(),
   HOSTNAME:              z.string().default(os.hostname()),
   LOG_UNITS:             z.string().default(''),
   LOG_SYSTEM:            z.coerce.boolean().default(false),

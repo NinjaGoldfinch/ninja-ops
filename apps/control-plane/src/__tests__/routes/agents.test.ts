@@ -25,7 +25,7 @@ const mockAgent = {
   nodeId: 'node-uuid-1',
   vmid: 100,
   hostname: 'container-01',
-  version: '1.0.0',
+  bundleHash: 'abc123deadbeef',
   kind: 'deploy' as const,
   status: 'idle' as const,
   lastSeenAt: '2024-01-01T00:00:00.000Z',

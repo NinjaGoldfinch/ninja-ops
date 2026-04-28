@@ -4,6 +4,7 @@ import { childLogger } from '../lib/logger.js'
 import { config } from '../config.js'
 import { AppError } from '../errors.js'
 import { JobLogger } from './job-logger.js'
+import { getBundleVersions } from './bundle-versions.js'
 
 const agentDeployerLog = childLogger('agent-deployer')
 
@@ -128,11 +129,13 @@ export async function deployAgentIntoLxc(
 
   // Step 5 — write .env
   // Base64-encode content so newlines survive pct exec argument passing
+  const { deployAgentHash } = getBundleVersions()
   const envContent = [
     `NODE_ID=${nodeId}`,
     `VMID=${vmid}`,
     `CONTROL_PLANE_URL=${controlPlaneUrl}`,
     `AGENT_SECRET=${config.AGENT_SECRET}`,
+    `AGENT_BUNDLE_HASH=${deployAgentHash}`,
   ].join('\n') + '\n'
   const envB64 = Buffer.from(envContent).toString('base64')
 
@@ -237,11 +240,13 @@ export async function deployLogAgentIntoLxc(
   )
 
   // Step 5 — write .env
+  const { logAgentHash } = getBundleVersions()
   const envContent = [
     `NODE_ID=${nodeId}`,
     `VMID=${vmid}`,
     `CONTROL_PLANE_URL=${controlPlaneUrl}`,
     `AGENT_SECRET=${config.AGENT_SECRET}`,
+    `AGENT_BUNDLE_HASH=${logAgentHash}`,
     ...(logUnits ? [`LOG_UNITS=${logUnits}`] : []),
   ].join('\n') + '\n'
   const envB64 = Buffer.from(envContent).toString('base64')
