@@ -20,9 +20,11 @@ The script will:
 1. Verify Node.js 22+, pnpm, and Docker are installed and running
 2. Auto-generate `JWT_SECRET`, `ENCRYPTION_KEY`, `AGENT_SECRET`, and `GITHUB_WEBHOOK_SECRET`
 3. Prompt for `DATABASE_URL`, `REDIS_URL`, and `CORS_ORIGIN` (with sensible defaults)
-4. Display all secrets in a bordered block so you can save them to a password manager
-5. Write `apps/control-plane/.env`
-6. Start Docker services, run `pnpm install`, `db:migrate`, and `db:seed`
+4. Prompt for `SELF_DEPLOY_HOST` (auto-detected from local IP) and `SELF_DEPLOY_SSH_KEY` — offer to generate the key if absent
+5. Prompt for `GITHUB_REPO` (auto-detected from `git remote`) and optional `GITHUB_TOKEN`
+6. Display generated secrets in a bordered block so you can save them to a password manager
+7. Write `env/control-plane.env` and `env/deploy-agent.env`
+8. Start Docker services, run `pnpm install`, `db:migrate`, and `db:seed`
 
 **Flags:**
 
@@ -196,6 +198,51 @@ All variables for `apps/control-plane/.env`:
 | `CORS_ORIGIN` | No | — | Comma-separated allowed origins. Empty = same-origin only |
 | `RATE_LIMIT_MAX` | No | `100` | Max requests per window (global) |
 | `RATE_LIMIT_WINDOW` | No | `60000` | Rate limit window in milliseconds |
+| `SELF_DEPLOY_HOST` | No | — | IP/hostname of the machine running control-plane. Enables one-click redeploy from the `/services` dashboard page |
+| `SELF_DEPLOY_SSH_KEY` | No | — | Path to an SSH private key the control-plane can use to SSH into `SELF_DEPLOY_HOST` |
+| `SERVICE_CONTROL_PLANE_UNIT` | No | `ninja-control-plane` | systemd unit name for the control-plane service |
+| `SERVICE_DASHBOARD_UNIT` | No | `nginx` | systemd unit name for the dashboard (nginx) service |
+| `SERVICE_CONTROL_PLANE_DIR` | No | `/opt/ninja-ops` | Repo working directory on the deploy host for control-plane |
+| `SERVICE_DASHBOARD_DIR` | No | `/opt/ninja-ops` | Repo working directory on the deploy host for the dashboard |
+| `GITHUB_REPO` | No | — | `owner/repo` — enables the update-available badge in `/services` by polling GitHub Releases |
+| `GITHUB_TOKEN` | No | — | GitHub personal access token. Optional; avoids the 60 req/hour unauthenticated rate limit |
+| `SERVICE_VERSION_POLL_INTERVAL_MS` | No | `1800000` | How often (ms) to poll GitHub for new releases. Default: 30 minutes |
+
+---
+
+## Service self-redeployment
+
+The `/services` dashboard page lets admins redeploy the control-plane and dashboard in one click. It SSHes into the host, runs `git reset --hard`, rebuilds, and restarts the systemd service.
+
+### Required env vars
+
+```
+SELF_DEPLOY_HOST=10.0.0.20          # IP or hostname of the machine to SSH into
+SELF_DEPLOY_SSH_KEY=/etc/ninja-ops/id_ed25519  # private key file (readable by the service user)
+```
+
+### Generate an SSH key (if you don't already have one)
+
+```bash
+ssh-keygen -t ed25519 -f /etc/ninja-ops/id_ed25519 -N "" -C "ninja-ops-self-deploy"
+```
+
+Then authorise it on the target machine:
+
+```bash
+cat /etc/ninja-ops/id_ed25519.pub >> ~/.ssh/authorized_keys
+```
+
+### GitHub version checking
+
+With `GITHUB_REPO` set, the dashboard polls GitHub Releases every 30 minutes and shows a yellow badge when a newer version is available:
+
+```
+GITHUB_REPO=NinjaGoldfinch/ninja-ops   # owner/repo
+GITHUB_TOKEN=ghp_...                    # optional — avoids 60 req/h unauthenticated limit
+```
+
+Without `GITHUB_REPO`, the dashboard still works — "Update available" simply never shows for platform services.
 
 ---
 

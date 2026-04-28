@@ -307,6 +307,93 @@ prompt_default "CORS_ORIGIN" "http://localhost:5173"
 CORS_ORIGIN="$REPLY"
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  4b. SERVICE SELF-REDEPLOYMENT (optional)
+# ─────────────────────────────────────────────────────────────────────────────
+printf '\n'
+log_info "Service self-redeployment — enables one-click redeploy from the /services dashboard page."
+log_info "(Leave SELF_DEPLOY_HOST blank to skip; you can add these to the .env manually later.)"
+printf '\n'
+
+# Auto-detect a non-loopback IPv4 to suggest as the default
+_local_ip=''
+if command -v ip >/dev/null 2>&1; then
+  _local_ip=$(ip -4 addr show 2>/dev/null \
+    | grep 'inet ' | awk '{print $2}' | sed 's|/.*||' \
+    | grep -v '^127\.' | grep -v '^169\.254\.' | head -1)
+elif command -v ifconfig >/dev/null 2>&1; then
+  _local_ip=$(ifconfig 2>/dev/null \
+    | grep 'inet ' | awk '{print $2}' | sed 's/addr://' \
+    | grep -v '^127\.' | grep -v '^169\.254\.' | head -1)
+fi
+
+prompt_default "SELF_DEPLOY_HOST (IP/hostname of this machine, blank to skip)" "${_local_ip:-}"
+SELF_DEPLOY_HOST="$REPLY"
+
+SELF_DEPLOY_SSH_KEY=""
+if [ -n "$SELF_DEPLOY_HOST" ]; then
+  _ssh_default="/etc/ninja-ops/id_ed25519"
+  prompt_default "SELF_DEPLOY_SSH_KEY (path to SSH private key for self-deployment)" "$_ssh_default"
+  SELF_DEPLOY_SSH_KEY="$REPLY"
+
+  # Offer to generate the key if the file does not exist
+  if [ -n "$SELF_DEPLOY_SSH_KEY" ] && [ ! -f "$SELF_DEPLOY_SSH_KEY" ]; then
+    printf 'Key not found at %s. Generate one now? [Y/n]: ' "$SELF_DEPLOY_SSH_KEY"
+    read -r _gen_key
+    case "$_gen_key" in
+      n|N)
+        log_warn "Key not generated — create it manually and set SELF_DEPLOY_SSH_KEY in .env."
+        ;;
+      *)
+        _key_dir=$(dirname "$SELF_DEPLOY_SSH_KEY")
+        mkdir -p "$_key_dir" 2>/dev/null || true
+        if ssh-keygen -t ed25519 -f "$SELF_DEPLOY_SSH_KEY" -N "" -C "ninja-ops-self-deploy" 2>/dev/null; then
+          log_ok "Key generated at $SELF_DEPLOY_SSH_KEY"
+          printf '\n'
+          log_warn "Add this public key to authorized_keys on $SELF_DEPLOY_HOST:"
+          printf '\n'
+          cat "${SELF_DEPLOY_SSH_KEY}.pub" 2>/dev/null || true
+          printf '\n'
+          printf '%sPress Enter once you have added the public key to authorized_keys...%s ' \
+            "$C_YLW" "$C_RST"
+          read -r _ak_done
+        else
+          log_warn "ssh-keygen failed — create the key manually."
+        fi
+        ;;
+    esac
+  fi
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  4c. GITHUB VERSION CHECKING (optional)
+# ─────────────────────────────────────────────────────────────────────────────
+printf '\n'
+log_info "GitHub version checking — shows an update-available badge in the dashboard."
+log_info "(Leave GITHUB_REPO blank to skip; the dashboard will still work without it.)"
+printf '\n'
+
+# Auto-detect repo from git remote
+_github_repo_default=''
+_remote_url=$(git -C "$REPO_ROOT" remote get-url origin 2>/dev/null || true)
+case "$_remote_url" in
+  https://github.com/*)
+    _github_repo_default=$(printf '%s' "$_remote_url" \
+      | sed 's|https://github.com/||' | sed 's|\.git$||') ;;
+  git@github.com:*)
+    _github_repo_default=$(printf '%s' "$_remote_url" \
+      | sed 's|git@github.com:||'    | sed 's|\.git$||') ;;
+esac
+
+prompt_default "GITHUB_REPO (owner/repo, blank to skip)" "${_github_repo_default:-}"
+GITHUB_REPO="$REPLY"
+
+GITHUB_TOKEN=""
+if [ -n "$GITHUB_REPO" ]; then
+  prompt_default "GITHUB_TOKEN (personal access token, blank to skip — avoids rate limits)" ""
+  GITHUB_TOKEN="$REPLY"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  5. DISPLAY "SAVE THESE" BLOCK
 # ─────────────────────────────────────────────────────────────────────────────
 printf '\n'
@@ -374,6 +461,31 @@ mkdir -p "$(dirname "$ENV_FILE")"
   printf '# ── Rate Limiting ───────────────────────────────────────\n'
   printf 'RATE_LIMIT_MAX=100\n'
   printf 'RATE_LIMIT_WINDOW=60000\n'
+  printf '\n'
+  printf '# ── Service self-redeployment ───────────────────────────\n'
+  printf '# SSH into this machine to git-pull, build, and restart services.\n'
+  if [ -n "$SELF_DEPLOY_HOST" ]; then
+    printf 'SELF_DEPLOY_HOST=%s\n' "$SELF_DEPLOY_HOST"
+    printf 'SELF_DEPLOY_SSH_KEY=%s\n' "$SELF_DEPLOY_SSH_KEY"
+  else
+    printf '# SELF_DEPLOY_HOST=             # IP/hostname of this machine\n'
+    printf '# SELF_DEPLOY_SSH_KEY=          # Path to SSH private key (e.g. /etc/ninja-ops/id_ed25519)\n'
+  fi
+  printf '# SERVICE_CONTROL_PLANE_UNIT=ninja-control-plane\n'
+  printf '# SERVICE_DASHBOARD_UNIT=nginx\n'
+  printf '# SERVICE_CONTROL_PLANE_DIR=/opt/ninja-ops\n'
+  printf '# SERVICE_DASHBOARD_DIR=/opt/ninja-ops\n'
+  printf '\n'
+  printf '# ── GitHub version checking ─────────────────────────────\n'
+  printf '# Polls GitHub Releases API to show update-available badges in the dashboard.\n'
+  if [ -n "$GITHUB_REPO" ]; then
+    printf 'GITHUB_REPO=%s\n' "$GITHUB_REPO"
+    [ -n "$GITHUB_TOKEN" ] && printf 'GITHUB_TOKEN=%s\n' "$GITHUB_TOKEN"
+  else
+    printf '# GITHUB_REPO=                  # owner/repo (e.g. NinjaGoldfinch/ninja-ops)\n'
+    printf '# GITHUB_TOKEN=                 # Personal access token (avoids rate limits)\n'
+  fi
+  printf '# SERVICE_VERSION_POLL_INTERVAL_MS=1800000  # default: 30 minutes\n'
 } > "$ENV_FILE"
 
 log_ok "Written to env/control-plane.env"
@@ -419,7 +531,8 @@ log_warn "Fill in NODE_ID and VMID in env/deploy-agent.env before running the ag
 # Export collected values so child processes (migrate, seed) can read them
 # without needing a dotenv loader — migrate.ts reads process.env directly.
 export DATABASE_URL REDIS_URL JWT_SECRET ENCRYPTION_KEY \
-       AGENT_SECRET GITHUB_WEBHOOK_SECRET CORS_ORIGIN
+       AGENT_SECRET GITHUB_WEBHOOK_SECRET CORS_ORIGIN \
+       SELF_DEPLOY_HOST SELF_DEPLOY_SSH_KEY GITHUB_REPO GITHUB_TOKEN
 
 printf '\n'
 
