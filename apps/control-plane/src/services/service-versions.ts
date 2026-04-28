@@ -7,7 +7,7 @@ import type { ServiceVersion, ServiceName } from '@ninja/types'
 
 const log = childLogger('service-versions')
 
-const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..')
+const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..')
 
 function readPackageVersion(appName: string): string {
   try {
