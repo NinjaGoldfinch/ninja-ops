@@ -280,14 +280,14 @@ Uses `git fetch + reset --hard` to avoid merge conflicts with locally generated 
 ```bash
 pct exec 102 -- bash -c "
   cd /opt/ninja-ops && \
-  sudo -u ninja git fetch origin && \
-  sudo -u ninja git reset --hard origin/main && \
-  sudo -u ninja pnpm install --frozen-lockfile && \
-  sudo -u ninja pnpm --filter @ninja/types build && \
-  sudo -u ninja pnpm --filter @ninja/control-plane build && \
-  sudo -u ninja pnpm package:agent && \
-  sudo -u ninja pnpm package:log-agent && \
-  sudo -E -u ninja DATABASE_URL=\$(grep DATABASE_URL /etc/ninja-ops/control-plane.env | cut -d= -f2-) \
+  sudo -H -u ninja git fetch origin && \
+  sudo -H -u ninja git reset --hard origin/main && \
+  sudo -H -u ninja pnpm install --frozen-lockfile && \
+  sudo -H -u ninja pnpm --filter @ninja/types build && \
+  sudo -H -u ninja pnpm --filter @ninja/control-plane build && \
+  sudo -H -u ninja pnpm package:agent && \
+  sudo -H -u ninja pnpm package:log-agent && \
+  sudo -H -E -u ninja DATABASE_URL=\$(grep DATABASE_URL /etc/ninja-ops/control-plane.env | cut -d= -f2-) \
     pnpm --filter @ninja/control-plane db:migrate && \
   systemctl restart ninja-control-plane
 "
@@ -301,11 +301,11 @@ Build on CT 102, transfer to CT 103 — the control plane never restarts.
 # Build on the control plane (VITE_API_URL empty = same-origin via nginx)
 pct exec 102 -- bash -c "
   cd /opt/ninja-ops && \
-  sudo -u ninja git fetch origin && \
-  sudo -u ninja git reset --hard origin/main && \
-  sudo -u ninja pnpm install --frozen-lockfile && \
-  sudo -u ninja pnpm --filter @ninja/types build && \
-  VITE_API_URL= sudo -u ninja pnpm --filter @ninja/dashboard build && \
+  sudo -H -u ninja git fetch origin && \
+  sudo -H -u ninja git reset --hard origin/main && \
+  sudo -H -u ninja pnpm install --frozen-lockfile && \
+  sudo -H -u ninja pnpm --filter @ninja/types build && \
+  VITE_API_URL= sudo -H -u ninja pnpm --filter @ninja/dashboard build && \
   tar -czf /tmp/ninja-dashboard.tar.gz -C /opt/ninja-ops/apps/dashboard dist
 "
 

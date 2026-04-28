@@ -322,13 +322,7 @@ log_ok "Service user ready"
 
 # ── pnpm ─────────────────────────────────────────────────────────────────────
 log_info "Installing pnpm..."
-exec_ct "$CT_ID" "
-  export PNPM_HOME=/home/${SERVICE_USER}/.local/share/pnpm
-  export PATH=\"\$PNPM_HOME:\$PATH\"
-  curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=10 HOME=/home/${SERVICE_USER} bash -
-  chown -R ${SERVICE_USER}:${SERVICE_USER} /home/${SERVICE_USER}/.local
-  ln -sf /home/${SERVICE_USER}/.local/share/pnpm/pnpm /usr/local/bin/pnpm
-"
+exec_ct "$CT_ID" "npm install -g pnpm"
 log_ok "pnpm installed"
 
 # ── Clone repository ─────────────────────────────────────────────────────────
@@ -339,8 +333,8 @@ if [ -n "$GITHUB_TOKEN" ]; then
 fi
 exec_ct "$CT_ID" "
   if [ -d '${INSTALL_DIR}/.git' ]; then
-    sudo -u ${SERVICE_USER} git -C '${INSTALL_DIR}' fetch origin
-    sudo -u ${SERVICE_USER} git -C '${INSTALL_DIR}' reset --hard origin/${REPO_BRANCH}
+    sudo -H -u ${SERVICE_USER} git -C '${INSTALL_DIR}' fetch origin
+    sudo -H -u ${SERVICE_USER} git -C '${INSTALL_DIR}' reset --hard origin/${REPO_BRANCH}
   else
     rm -rf '${INSTALL_DIR}'
     git clone --branch ${REPO_BRANCH} ${CLONE_URL} ${INSTALL_DIR}
@@ -350,19 +344,19 @@ log_ok "Repository ready at $INSTALL_DIR"
 
 # ── Install deps and build ───────────────────────────────────────────────────
 log_info "Installing dependencies (this may take a few minutes)..."
-exec_ct "$CT_ID" "cd ${INSTALL_DIR} && sudo -u ${SERVICE_USER} pnpm install --frozen-lockfile"
+exec_ct "$CT_ID" "cd ${INSTALL_DIR} && sudo -H -u ${SERVICE_USER} pnpm install --frozen-lockfile"
 log_ok "Dependencies installed"
 
 log_info "Building packages..."
 exec_ct "$CT_ID" "cd ${INSTALL_DIR} && \
-  sudo -u ${SERVICE_USER} pnpm --filter @ninja/types build && \
-  sudo -u ${SERVICE_USER} pnpm --filter @ninja/control-plane build"
+  sudo -H -u ${SERVICE_USER} pnpm --filter @ninja/types build && \
+  sudo -H -u ${SERVICE_USER} pnpm --filter @ninja/control-plane build"
 log_ok "Control plane built"
 
 log_info "Packaging agent bundles..."
 exec_ct "$CT_ID" "cd ${INSTALL_DIR} && \
-  sudo -u ${SERVICE_USER} pnpm package:agent && \
-  sudo -u ${SERVICE_USER} pnpm package:log-agent"
+  sudo -H -u ${SERVICE_USER} pnpm package:agent && \
+  sudo -H -u ${SERVICE_USER} pnpm package:log-agent"
 log_ok "Agent bundles packaged"
 
 # ── Write environment file ───────────────────────────────────────────────────
@@ -415,7 +409,7 @@ log_ok "Environment file written to /etc/ninja-ops/control-plane.env"
 log_info "Running database migrations..."
 exec_ct "$CT_ID" "cd ${INSTALL_DIR} && \
   DATABASE_URL='${DATABASE_URL}' \
-  sudo -E -u ${SERVICE_USER} pnpm --filter @ninja/control-plane db:migrate"
+  sudo -H -E -u ${SERVICE_USER} pnpm --filter @ninja/control-plane db:migrate"
 log_ok "Migrations complete"
 
 # ── Seed database ────────────────────────────────────────────────────────────
@@ -425,7 +419,7 @@ if [ "$RUN_SEED" = "true" ]; then
     DATABASE_URL='${DATABASE_URL}' \
     ADMIN_USERNAME='${ADMIN_USERNAME}' \
     ADMIN_PASSWORD='${ADMIN_PASSWORD}' \
-    sudo -E -u ${SERVICE_USER} pnpm --filter @ninja/control-plane db:seed"
+    sudo -H -E -u ${SERVICE_USER} pnpm --filter @ninja/control-plane db:seed"
   log_ok "Database seeded"
 else
   log_info "Skipping database seed (RUN_SEED=$RUN_SEED)"
